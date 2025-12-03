@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Lead, PipelineStage, ContactMethod } from '@/types'
 
-interface Activity {
+export interface PipelineActivity {
   id: string
   type: 'contacted' | 'note_added' | 'stage_changed' | 'tag_added' | 'follow_up_scheduled'
   contactMethod?: string
@@ -10,22 +10,22 @@ interface Activity {
   createdAt: string
 }
 
-interface CustomField {
+export interface CustomField {
   key: string
   value: string
 }
 
-interface PipelineLead extends Lead {
+export interface PipelineLead extends Lead {
   pipelineId: string
   stage: PipelineStage
   addedAt: string
   notes: string[]
   tags: string[]
   customFields: CustomField[]
-  activities: Activity[]
+  activities: PipelineActivity[]
   nextFollowUpAt?: string
   lastContactedAt?: string
-  lastContactMethod?: string
+  lastContactMethod?: ContactMethod
 }
 
 interface LeadStore {

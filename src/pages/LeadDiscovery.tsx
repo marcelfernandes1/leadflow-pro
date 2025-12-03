@@ -70,7 +70,7 @@ export default function LeadDiscovery() {
   const [searchProgress, setSearchProgress] = useState(0)
   const [searchStatus, setSearchStatus] = useState('')
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
-  const [useRealApi, setUseRealApi] = useState(true)
+  // useRealApi state removed - always using real API
 
   const { discoveredLeads, setDiscoveredLeads, addToPipeline, setLastSearch } =
     useLeadStore()

@@ -267,10 +267,10 @@ LeadFlow Pro is a lead generation and CRM platform for agencies with:
 - [x] Optimize pipeline view for mobile (horizontal scroll or stacked)
 
 ### 6.7 Accessibility
-- [ ] Ensure WCAG 2.1 AA compliance
-- [ ] Add keyboard navigation
+- [x] Ensure WCAG 2.1 AA compliance
+- [x] Add keyboard navigation
 - [ ] Test with screen reader
-- [ ] Ensure proper focus indicators
+- [x] Ensure proper focus indicators
 
 ---
 

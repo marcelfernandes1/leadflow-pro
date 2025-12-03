@@ -78,29 +78,10 @@ import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { exportLeadsToCSV } from '@/lib/export'
 import { Link } from 'wouter'
-import { useLeadStore } from '@/hooks/useLeadStore'
+import { useLeadStore, type PipelineLead } from '@/hooks/useLeadStore'
 import { ContactModal } from '@/components/ContactModal'
 import { LeadDetailModal } from '@/components/LeadDetailModal'
 import type { PipelineStage, Lead, ContactMethod } from '@/types'
-
-interface PipelineLead extends Lead {
-  pipelineId: string
-  stage: PipelineStage
-  addedAt: string
-  notes?: string[]
-  tags?: string[]
-  customFields?: Array<{ key: string; value: string }>
-  activities?: Array<{
-    id: string
-    type: string
-    contactMethod?: string
-    details: string
-    createdAt: string
-  }>
-  nextFollowUpAt?: string
-  lastContactedAt?: string
-  lastContactMethod?: string
-}
 
 interface StageConfig {
   id: PipelineStage
@@ -965,7 +946,7 @@ export default function Pipeline() {
       <ContactModal
         open={contactModalOpen}
         onOpenChange={setContactModalOpen}
-        lead={selectedLead}
+        lead={selectedLead as Lead | null}
         onContact={handleTrackContact}
       />
 
@@ -973,7 +954,7 @@ export default function Pipeline() {
       <LeadDetailModal
         open={detailModalOpen}
         onOpenChange={setDetailModalOpen}
-        lead={selectedLead}
+        lead={selectedLead as any}
         onContact={(method) => {
           // Open the contact URL and show tracking confirmation
           handleTrackContact(method)

@@ -1,12 +1,8 @@
-import type { Lead } from '@/types'
+import type { Lead, PipelineStage, ContactMethod } from '@/types'
 
-interface ExportableLead extends Lead {
-  stage?: string
-  tags?: string[]
-  notes?: string[]
-  lastContactedAt?: string
-  lastContactMethod?: string
-  nextFollowUpAt?: string
+interface ExportableLead extends Omit<Lead, 'stage' | 'lastContactMethod'> {
+  stage?: PipelineStage | string
+  lastContactMethod?: ContactMethod | string
   addedAt?: string
 }
 

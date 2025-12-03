@@ -19,7 +19,6 @@ import {
   Calendar,
   Clock,
   CheckCircle2,
-  AlertCircle,
   ArrowRight,
   Phone,
   Mail,

@@ -30,7 +30,7 @@ export interface Lead {
   // CRM
   stage?: PipelineStage
   tags?: string[]
-  notes?: string
+  notes?: string[]
   lastContactedAt?: string
   lastContactMethod?: ContactMethod
   nextFollowUpAt?: string

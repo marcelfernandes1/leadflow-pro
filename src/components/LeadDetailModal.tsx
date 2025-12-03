@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { format, formatDistanceToNow } from 'date-fns'
 import {
   Mail,
@@ -56,14 +56,14 @@ interface CustomField {
   value: string
 }
 
-interface ExtendedLead extends Lead {
+interface ExtendedLead extends Omit<Lead, 'lastContactMethod'> {
   notes?: string[]
   tags?: string[]
   customFields?: CustomField[]
   activities?: Activity[]
   nextFollowUpAt?: string
   lastContactedAt?: string
-  lastContactMethod?: string
+  lastContactMethod?: ContactMethod | string
   createdAt?: string
   updatedAt?: string
 }

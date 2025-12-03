@@ -18,10 +18,6 @@ import {
   PieChart,
   Pie,
   Cell,
-  Legend,
-  FunnelChart,
-  Funnel,
-  LabelList,
 } from 'recharts'
 import { BarChart3, PieChart as PieChartIcon, TrendingUp, Filter } from 'lucide-react'
 import { useLeadStore } from '@/hooks/useLeadStore'
@@ -314,8 +310,8 @@ export default function Analytics() {
                           outerRadius={100}
                           paddingAngle={2}
                           dataKey="value"
-                          label={({ name, percent }) =>
-                            `${name} (${(percent * 100).toFixed(0)}%)`
+                          label={({ name, percent }: { name?: string; percent?: number }) =>
+                            `${name ?? ''} (${((percent ?? 0) * 100).toFixed(0)}%)`
                           }
                           labelLine={false}
                         >
