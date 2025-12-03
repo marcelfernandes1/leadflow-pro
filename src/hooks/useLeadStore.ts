@@ -10,12 +10,18 @@ interface Activity {
   createdAt: string
 }
 
+interface CustomField {
+  key: string
+  value: string
+}
+
 interface PipelineLead extends Lead {
   pipelineId: string
   stage: PipelineStage
   addedAt: string
   notes: string[]
   tags: string[]
+  customFields: CustomField[]
   activities: Activity[]
   nextFollowUpAt?: string
   lastContactedAt?: string
@@ -44,6 +50,11 @@ interface LeadStore {
   // Tags
   addTag: (pipelineId: string, tag: string) => void
   removeTag: (pipelineId: string, tag: string) => void
+
+  // Custom fields
+  addCustomField: (pipelineId: string, key: string, value: string) => void
+  updateCustomField: (pipelineId: string, key: string, value: string) => void
+  removeCustomField: (pipelineId: string, key: string) => void
 
   // Follow-up scheduling
   scheduleFollowUp: (pipelineId: string, date: string, note?: string) => void
@@ -84,6 +95,7 @@ export const useLeadStore = create<LeadStore>()(
           addedAt: now,
           notes: [],
           tags: [],
+          customFields: [],
           activities: [
             {
               id: `activity-${Date.now()}`,
@@ -216,6 +228,42 @@ export const useLeadStore = create<LeadStore>()(
             return {
               ...l,
               tags: l.tags.filter((t) => t !== tag),
+            }
+          }),
+        })),
+
+      // Custom fields
+      addCustomField: (pipelineId, key, value) =>
+        set((state) => ({
+          pipelineLeads: state.pipelineLeads.map((l) => {
+            if (l.pipelineId !== pipelineId) return l
+            // Check if field already exists
+            if (l.customFields.some((f) => f.key === key)) return l
+            return {
+              ...l,
+              customFields: [...l.customFields, { key, value }],
+            }
+          }),
+        })),
+      updateCustomField: (pipelineId, key, value) =>
+        set((state) => ({
+          pipelineLeads: state.pipelineLeads.map((l) => {
+            if (l.pipelineId !== pipelineId) return l
+            return {
+              ...l,
+              customFields: l.customFields.map((f) =>
+                f.key === key ? { ...f, value } : f
+              ),
+            }
+          }),
+        })),
+      removeCustomField: (pipelineId, key) =>
+        set((state) => ({
+          pipelineLeads: state.pipelineLeads.map((l) => {
+            if (l.pipelineId !== pipelineId) return l
+            return {
+              ...l,
+              customFields: l.customFields.filter((f) => f.key !== key),
             }
           }),
         })),

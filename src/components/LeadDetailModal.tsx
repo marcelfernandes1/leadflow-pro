@@ -18,6 +18,9 @@ import {
   CheckCircle2,
   Circle,
   Send,
+  FileText,
+  Pencil,
+  Trash2,
 } from 'lucide-react'
 import {
   Dialog,
@@ -48,9 +51,15 @@ interface Activity {
   createdAt: string
 }
 
+interface CustomField {
+  key: string
+  value: string
+}
+
 interface ExtendedLead extends Lead {
   notes?: string[]
   tags?: string[]
+  customFields?: CustomField[]
   activities?: Activity[]
   nextFollowUpAt?: string
   lastContactedAt?: string
@@ -67,6 +76,9 @@ interface LeadDetailModalProps {
   onAddNote: (note: string) => void
   onAddTag: (tag: string) => void
   onRemoveTag: (tag: string) => void
+  onAddCustomField?: (key: string, value: string) => void
+  onUpdateCustomField?: (key: string, value: string) => void
+  onRemoveCustomField?: (key: string) => void
   onScheduleFollowUp: (date: string, note?: string) => void
   onStageChange?: (stage: PipelineStage) => void
 }
@@ -97,6 +109,9 @@ export function LeadDetailModal({
   onAddNote,
   onAddTag,
   onRemoveTag,
+  onAddCustomField,
+  onUpdateCustomField,
+  onRemoveCustomField,
   onScheduleFollowUp,
   onStageChange,
 }: LeadDetailModalProps) {
@@ -104,6 +119,10 @@ export function LeadDetailModal({
   const [newTag, setNewTag] = useState('')
   const [followUpDate, setFollowUpDate] = useState('')
   const [followUpNote, setFollowUpNote] = useState('')
+  const [newFieldKey, setNewFieldKey] = useState('')
+  const [newFieldValue, setNewFieldValue] = useState('')
+  const [editingField, setEditingField] = useState<string | null>(null)
+  const [editingValue, setEditingValue] = useState('')
 
   const handleAddNote = () => {
     if (newNote.trim()) {
@@ -125,6 +144,27 @@ export function LeadDetailModal({
       setFollowUpDate('')
       setFollowUpNote('')
     }
+  }
+
+  const handleAddCustomField = () => {
+    if (newFieldKey.trim() && newFieldValue.trim() && onAddCustomField) {
+      onAddCustomField(newFieldKey.trim(), newFieldValue.trim())
+      setNewFieldKey('')
+      setNewFieldValue('')
+    }
+  }
+
+  const handleUpdateCustomField = (key: string) => {
+    if (editingValue.trim() && onUpdateCustomField) {
+      onUpdateCustomField(key, editingValue.trim())
+      setEditingField(null)
+      setEditingValue('')
+    }
+  }
+
+  const startEditing = (field: CustomField) => {
+    setEditingField(field.key)
+    setEditingValue(field.value)
   }
 
   if (!lead) return null
@@ -283,6 +323,118 @@ export function LeadDetailModal({
                   </div>
                 </div>
               </div>
+
+              <Separator />
+
+              {/* Custom Fields */}
+              {onAddCustomField && (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-medium flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Custom Fields
+                  </h4>
+
+                  {/* Existing fields */}
+                  {(lead.customFields || []).length > 0 && (
+                    <div className="space-y-2">
+                      {(lead.customFields || []).map((field) => (
+                        <div
+                          key={field.key}
+                          className="flex items-center gap-2 p-2 bg-muted rounded-lg"
+                        >
+                          <span className="text-xs font-medium text-muted-foreground min-w-[80px]">
+                            {field.key}:
+                          </span>
+                          {editingField === field.key ? (
+                            <div className="flex-1 flex items-center gap-1">
+                              <Input
+                                value={editingValue}
+                                onChange={(e) => setEditingValue(e.target.value)}
+                                className="h-7 text-xs flex-1"
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleUpdateCustomField(field.key)
+                                  if (e.key === 'Escape') {
+                                    setEditingField(null)
+                                    setEditingValue('')
+                                  }
+                                }}
+                                autoFocus
+                              />
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7"
+                                onClick={() => handleUpdateCustomField(field.key)}
+                              >
+                                <CheckCircle2 className="h-3 w-3 text-green-500" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7"
+                                onClick={() => {
+                                  setEditingField(null)
+                                  setEditingValue('')
+                                }}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <>
+                              <span className="text-sm flex-1">{field.value}</span>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7"
+                                onClick={() => startEditing(field)}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                              {onRemoveCustomField && (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 hover:text-destructive"
+                                  onClick={() => onRemoveCustomField(field.key)}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add new field */}
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={newFieldKey}
+                      onChange={(e) => setNewFieldKey(e.target.value)}
+                      placeholder="Field name"
+                      className="h-8 text-xs w-28"
+                    />
+                    <Input
+                      value={newFieldValue}
+                      onChange={(e) => setNewFieldValue(e.target.value)}
+                      placeholder="Value"
+                      className="h-8 text-xs flex-1"
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddCustomField()}
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleAddCustomField}
+                      disabled={!newFieldKey.trim() || !newFieldValue.trim()}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               <Separator />
 

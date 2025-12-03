@@ -89,6 +89,7 @@ interface PipelineLead extends Lead {
   addedAt: string
   notes?: string[]
   tags?: string[]
+  customFields?: Array<{ key: string; value: string }>
   activities?: Array<{
     id: string
     type: string
@@ -425,6 +426,9 @@ export default function Pipeline() {
     addNote,
     addTag,
     removeTag,
+    addCustomField,
+    updateCustomField,
+    removeCustomField,
     scheduleFollowUp,
     bulkUpdateStage,
     bulkDelete,
@@ -439,6 +443,7 @@ export default function Pipeline() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [tagDialogOpen, setTagDialogOpen] = useState(false)
   const [bulkTagInput, setBulkTagInput] = useState('')
+  const [mobileStage, setMobileStage] = useState<PipelineStage>('new')
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -620,6 +625,45 @@ export default function Pipeline() {
     }
   }
 
+  const handleAddCustomField = (key: string, value: string) => {
+    if (selectedLead) {
+      addCustomField(selectedLead.pipelineId, key, value)
+      const updatedLead = pipelineLeads.find(
+        (l) => l.pipelineId === selectedLead.pipelineId
+      )
+      if (updatedLead) {
+        setSelectedLead(updatedLead)
+      }
+      toast.success(`Added field "${key}"`)
+    }
+  }
+
+  const handleUpdateCustomField = (key: string, value: string) => {
+    if (selectedLead) {
+      updateCustomField(selectedLead.pipelineId, key, value)
+      const updatedLead = pipelineLeads.find(
+        (l) => l.pipelineId === selectedLead.pipelineId
+      )
+      if (updatedLead) {
+        setSelectedLead(updatedLead)
+      }
+      toast.success(`Updated field "${key}"`)
+    }
+  }
+
+  const handleRemoveCustomField = (key: string) => {
+    if (selectedLead) {
+      removeCustomField(selectedLead.pipelineId, key)
+      const updatedLead = pipelineLeads.find(
+        (l) => l.pipelineId === selectedLead.pipelineId
+      )
+      if (updatedLead) {
+        setSelectedLead(updatedLead)
+      }
+      toast.success(`Removed field "${key}"`)
+    }
+  }
+
   const handleBulkMove = (stage: PipelineStage) => {
     if (selectedLeads.size === 0) return
     bulkUpdateStage(Array.from(selectedLeads), stage)
@@ -709,7 +753,7 @@ export default function Pipeline() {
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
-          className="flex items-center gap-4 p-3 bg-muted rounded-lg"
+          className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-muted rounded-lg"
         >
           <div className="flex items-center gap-2">
             <Checkbox
@@ -719,10 +763,18 @@ export default function Pipeline() {
             <span className="text-sm font-medium">
               {selectedLeads.size} selected
             </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="sm:hidden ml-auto"
+              onClick={() => setSelectedLeads(new Set())}
+            >
+              Clear
+            </Button>
           </div>
-          <div className="flex items-center gap-2 ml-auto">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 sm:ml-auto">
             <Select onValueChange={(value) => handleBulkMove(value as PipelineStage)}>
-              <SelectTrigger className="w-40">
+              <SelectTrigger className="w-32 sm:w-40 shrink-0">
                 <SelectValue placeholder="Move to..." />
               </SelectTrigger>
               <SelectContent>
@@ -736,30 +788,34 @@ export default function Pipeline() {
             <Button
               variant="outline"
               size="sm"
+              className="shrink-0"
               onClick={() => setTagDialogOpen(true)}
             >
-              <Tags className="h-4 w-4 mr-2" />
-              Add Tags
+              <Tags className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Add Tags</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
+              className="shrink-0"
               onClick={handleExportCSV}
             >
-              <Download className="h-4 w-4 mr-2" />
-              Export CSV
+              <Download className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Export CSV</span>
             </Button>
             <Button
               variant="destructive"
               size="sm"
+              className="shrink-0"
               onClick={() => setDeleteConfirmOpen(true)}
             >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete Selected
+              <Trash2 className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Delete</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
+              className="shrink-0 hidden sm:flex"
               onClick={() => setSelectedLeads(new Set())}
             >
               Clear Selection
@@ -798,18 +854,93 @@ export default function Pipeline() {
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <div className="flex gap-4 overflow-x-auto pb-4">
+          {/* Mobile Stage Selector */}
+          <div className="md:hidden mb-4">
+            <div className="flex gap-1 overflow-x-auto pb-2 -mx-4 px-4 snap-x snap-mandatory">
+              {stages.map((stage) => (
+                <button
+                  key={stage.id}
+                  onClick={() => setMobileStage(stage.id)}
+                  className={cn(
+                    'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors snap-start shrink-0',
+                    mobileStage === stage.id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted hover:bg-muted/80'
+                  )}
+                >
+                  <div className={cn('w-2 h-2 rounded-full', stage.color)} />
+                  {stage.title}
+                  <Badge variant="secondary" className="text-xs ml-1">
+                    {leadsByStage[stage.id].length}
+                  </Badge>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Mobile: Single Column View */}
+          <div className="md:hidden">
+            {stages
+              .filter((stage) => stage.id === mobileStage)
+              .map((stage) => (
+                <Card key={stage.id} className="h-full">
+                  <CardHeader className="py-3 px-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={cn('w-2 h-2 rounded-full', stage.color)} />
+                        <CardTitle className="text-sm font-medium">
+                          {stage.title}
+                        </CardTitle>
+                      </div>
+                      <Badge variant="secondary" className="text-xs">
+                        {leadsByStage[stage.id].length}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="px-2 pb-2">
+                    <SortableContext
+                      items={leadsByStage[stage.id].map((l) => l.pipelineId)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <div className="space-y-2 p-2">
+                        {leadsByStage[stage.id].length === 0 ? (
+                          <div className="text-center py-8 text-muted-foreground text-sm">
+                            No leads in this stage
+                          </div>
+                        ) : (
+                          leadsByStage[stage.id].map((lead) => (
+                            <SortableLeadCard
+                              key={lead.pipelineId}
+                              lead={lead}
+                              isSelected={selectedLeads.has(lead.pipelineId)}
+                              onSelect={() => handleSelectLead(lead.pipelineId)}
+                              onRemove={() => handleRemoveLead(lead.pipelineId)}
+                              onContact={() => handleContactLead(lead)}
+                              onViewDetails={() => handleViewDetails(lead)}
+                            />
+                          ))
+                        )}
+                      </div>
+                    </SortableContext>
+                  </CardContent>
+                </Card>
+              ))}
+          </div>
+
+          {/* Desktop: Horizontal Scroll Kanban */}
+          <div className="hidden md:flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scroll-smooth">
             {stages.map((stage) => (
-              <PipelineColumn
-                key={stage.id}
-                stage={stage}
-                leads={leadsByStage[stage.id]}
-                selectedLeads={selectedLeads}
-                onSelectLead={handleSelectLead}
-                onRemoveLead={handleRemoveLead}
-                onContactLead={handleContactLead}
-                onViewDetails={handleViewDetails}
-              />
+              <div key={stage.id} className="snap-start">
+                <PipelineColumn
+                  stage={stage}
+                  leads={leadsByStage[stage.id]}
+                  selectedLeads={selectedLeads}
+                  onSelectLead={handleSelectLead}
+                  onRemoveLead={handleRemoveLead}
+                  onContactLead={handleContactLead}
+                  onViewDetails={handleViewDetails}
+                />
+              </div>
             ))}
           </div>
 
@@ -850,6 +981,9 @@ export default function Pipeline() {
         onAddNote={handleAddNote}
         onAddTag={handleAddTag}
         onRemoveTag={handleRemoveTag}
+        onAddCustomField={handleAddCustomField}
+        onUpdateCustomField={handleUpdateCustomField}
+        onRemoveCustomField={handleRemoveCustomField}
         onScheduleFollowUp={handleScheduleFollowUp}
         onStageChange={handleStageChange}
       />

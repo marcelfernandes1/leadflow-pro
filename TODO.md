@@ -117,7 +117,7 @@ LeadFlow Pro is a lead generation and CRM platform for agencies with:
 - [x] Show activity timeline
 - [x] Add notes section
 - [x] Add tags functionality
-- [ ] Add custom fields (key-value pairs)
+- [x] Add custom fields (key-value pairs)
 
 ### 3.5 Follow-Up Scheduling
 - [x] Add "Schedule Follow-Up" button
@@ -247,7 +247,7 @@ LeadFlow Pro is a lead generation and CRM platform for agencies with:
 ### 6.3 Loading States
 - [x] Add skeleton screens everywhere (shadcn/ui Skeleton)
 - [x] Create skeletons for: lead cards, detail view, pipeline
-- [ ] Add shimmer animation to skeletons
+- [x] Add shimmer animation to skeletons
 
 ### 6.4 Empty States
 - [x] Design empty state for no search results
@@ -264,7 +264,7 @@ LeadFlow Pro is a lead generation and CRM platform for agencies with:
 ### 6.6 Mobile Responsiveness
 - [x] Test and fix all layouts on mobile
 - [x] Ensure touch-friendly tap targets
-- [ ] Optimize pipeline view for mobile (horizontal scroll or stacked)
+- [x] Optimize pipeline view for mobile (horizontal scroll or stacked)
 
 ### 6.7 Accessibility
 - [ ] Ensure WCAG 2.1 AA compliance
