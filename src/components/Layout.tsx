@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'wouter'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard,
   Search,
@@ -9,21 +9,22 @@ import {
   Zap,
   Menu,
   X,
+  ChevronRight,
+  Sparkles,
 } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Separator } from '@/components/ui/separator'
+import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { TooltipProvider } from '@/components/ui/tooltip'
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 
-// Skip to content link component
 function SkipToContent() {
   return (
     <a
       href="#main-content"
-      className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-4 focus:left-4 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+      className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-4 focus:left-4 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
     >
       Skip to main content
     </a>
@@ -32,7 +33,7 @@ function SkipToContent() {
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Discover Leads', href: '/discover', icon: Search },
+  { name: 'Discover', href: '/discover', icon: Search },
   { name: 'Pipeline', href: '/pipeline', icon: Kanban },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   { name: 'Settings', href: '/settings', icon: Settings },
@@ -45,10 +46,9 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const [location] = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [isCollapsed, setIsCollapsed] = useState(false)
 
-  // Handle keyboard navigation
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
-    // Close sidebar on Escape
     if (event.key === 'Escape' && sidebarOpen) {
       setSidebarOpen(false)
     }
@@ -59,111 +59,233 @@ export default function Layout({ children }: LayoutProps) {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
 
+  const sidebarVariants = {
+    expanded: { width: 280 },
+    collapsed: { width: 80 },
+  }
+
   return (
-    <TooltipProvider>
+    <TooltipProvider delayDuration={0}>
       <SkipToContent />
-      <div className="flex h-screen bg-background">
+      <div className="flex h-screen overflow-hidden bg-background gradient-mesh noise">
         {/* Mobile sidebar backdrop */}
-        {sidebarOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-black/50 lg:hidden"
-            onClick={() => setSidebarOpen(false)}
-            aria-hidden="true"
-          />
-        )}
+        <AnimatePresence>
+          {sidebarOpen && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-40 bg-obsidian-void/80 backdrop-blur-sm lg:hidden"
+              onClick={() => setSidebarOpen(false)}
+              aria-hidden="true"
+            />
+          )}
+        </AnimatePresence>
 
         {/* Sidebar */}
         <motion.aside
           initial={false}
-          animate={{
-            x: sidebarOpen ? 0 : -280,
-          }}
+          animate={isCollapsed ? 'collapsed' : 'expanded'}
+          variants={sidebarVariants}
+          transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
           className={cn(
-            'fixed inset-y-0 left-0 z-50 w-64 bg-card border-r flex flex-col lg:relative lg:translate-x-0',
-            'transition-transform duration-200 ease-in-out lg:transition-none'
+            'fixed inset-y-0 left-0 z-50 flex flex-col lg:relative',
+            'glass-prominent border-r border-white/5',
+            sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
           )}
-          style={{ transform: undefined }}
+          style={{ transition: 'transform 0.3s ease' }}
           aria-label="Main navigation"
           role="navigation"
         >
-          {/* Logo */}
-          <div className="flex items-center gap-2 px-6 py-5">
-            <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary">
-              <Zap className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <span className="text-xl font-bold">LeadFlow Pro</span>
+          {/* Logo Section */}
+          <div className="flex items-center justify-between px-4 py-5 h-[72px]">
+            <Link href="/">
+              <motion.div
+                className="flex items-center gap-3 cursor-pointer"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <div className="relative">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-xl gradient-violet shadow-lg shadow-violet/30">
+                    <Zap className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="absolute -inset-1 rounded-xl gradient-violet opacity-30 blur-lg -z-10" />
+                </div>
+                <AnimatePresence>
+                  {!isCollapsed && (
+                    <motion.div
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -10 }}
+                      transition={{ duration: 0.2 }}
+                      className="hidden lg:block"
+                    >
+                      <span className="text-lg font-display font-bold text-gradient-primary">
+                        LeadFlow
+                      </span>
+                      <span className="text-lg font-display font-bold text-foreground ml-1">
+                        Pro
+                      </span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            </Link>
+
+            {/* Mobile close button */}
             <Button
               variant="ghost"
-              size="icon"
-              className="ml-auto lg:hidden"
+              size="icon-sm"
+              className="lg:hidden"
               onClick={() => setSidebarOpen(false)}
               aria-label="Close navigation menu"
             >
               <X className="w-5 h-5" aria-hidden="true" />
             </Button>
+
+            {/* Desktop collapse button */}
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="hidden lg:flex"
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              <motion.div
+                animate={{ rotate: isCollapsed ? 180 : 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <ChevronRight className="w-4 h-4" aria-hidden="true" />
+              </motion.div>
+            </Button>
           </div>
 
-          <Separator />
+          {/* Divider */}
+          <div className="mx-4 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
 
           {/* Navigation */}
-          <ScrollArea className="flex-1 px-3 py-4">
-            <nav className="space-y-1" aria-label="Main menu">
-              {navigation.map((item) => {
+          <ScrollArea className="flex-1 px-3 py-6">
+            <nav className="space-y-1.5" aria-label="Main menu">
+              {navigation.map((item, index) => {
                 const isActive = location === item.href
-                return (
-                  <Link key={item.name} href={item.href}>
-                    <motion.div
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      className={cn(
-                        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer',
-                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-                        isActive
-                          ? 'bg-primary text-primary-foreground'
-                          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                const NavContent = (
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    whileHover={{ x: 4 }}
+                    whileTap={{ scale: 0.98 }}
+                    className={cn(
+                      'relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                      isActive
+                        ? 'text-white'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-white/5',
+                      isCollapsed && 'justify-center px-0'
+                    )}
+                    onClick={() => setSidebarOpen(false)}
+                    role="link"
+                    tabIndex={0}
+                    aria-current={isActive ? 'page' : undefined}
+                  >
+                    {/* Active background */}
+                    {isActive && (
+                      <motion.div
+                        layoutId="activeNav"
+                        className="absolute inset-0 rounded-xl gradient-violet"
+                        transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+                      />
+                    )}
+                    {/* Glow effect for active */}
+                    {isActive && (
+                      <div className="absolute inset-0 rounded-xl gradient-violet opacity-40 blur-xl -z-10" />
+                    )}
+
+                    <item.icon className={cn(
+                      'relative w-5 h-5 transition-transform',
+                      isActive && 'text-white'
+                    )} aria-hidden="true" />
+
+                    <AnimatePresence>
+                      {!isCollapsed && (
+                        <motion.span
+                          initial={{ opacity: 0, width: 0 }}
+                          animate={{ opacity: 1, width: 'auto' }}
+                          exit={{ opacity: 0, width: 0 }}
+                          className="relative whitespace-nowrap"
+                        >
+                          {item.name}
+                        </motion.span>
                       )}
-                      onClick={() => setSidebarOpen(false)}
-                      role="link"
-                      tabIndex={0}
-                      aria-current={isActive ? 'page' : undefined}
-                    >
-                      <item.icon className="w-5 h-5" aria-hidden="true" />
+                    </AnimatePresence>
+                  </motion.div>
+                )
+
+                return isCollapsed ? (
+                  <Tooltip key={item.name}>
+                    <TooltipTrigger asChild>
+                      <Link href={item.href}>{NavContent}</Link>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" sideOffset={10}>
                       {item.name}
-                    </motion.div>
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <Link key={item.name} href={item.href}>
+                    {NavContent}
                   </Link>
                 )
               })}
             </nav>
           </ScrollArea>
 
-          <Separator />
+          {/* Divider */}
+          <div className="mx-4 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
 
           {/* User section */}
           <div className="p-4">
-            <div className="flex items-center gap-3 px-2">
-              <Avatar className="w-9 h-9">
-                <AvatarFallback className="bg-primary text-primary-foreground text-sm">
-                  U
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">User</p>
-                <p className="text-xs text-muted-foreground">Free Plan</p>
+            <div className={cn(
+              'flex items-center gap-3 px-2 py-2 rounded-xl transition-colors hover:bg-white/5',
+              isCollapsed && 'justify-center px-0'
+            )}>
+              <div className="relative">
+                <Avatar className="w-9 h-9 border-2 border-violet/30">
+                  <AvatarFallback className="bg-gradient-to-br from-violet to-cyan text-white text-sm font-medium">
+                    U
+                  </AvatarFallback>
+                </Avatar>
+                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald border-2 border-obsidian-elevated" />
               </div>
+              <AnimatePresence>
+                {!isCollapsed && (
+                  <motion.div
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -10 }}
+                    className="flex-1 min-w-0"
+                  >
+                    <p className="text-sm font-medium truncate">User</p>
+                    <div className="flex items-center gap-1.5">
+                      <Badge variant="glass" className="text-2xs px-1.5 py-0">
+                        <Sparkles className="w-2.5 h-2.5 mr-1" />
+                        Free
+                      </Badge>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </motion.aside>
 
         {/* Main content */}
-        <div className="flex-1 flex flex-col min-w-0 lg:ml-0">
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {/* Mobile header */}
-          <header className="flex items-center gap-4 px-4 py-3 border-b lg:hidden" role="banner">
+          <header className="flex items-center gap-4 px-4 py-3 glass border-b border-white/5 lg:hidden" role="banner">
             <Button
               variant="ghost"
-              size="icon"
+              size="icon-sm"
               onClick={() => setSidebarOpen(true)}
               aria-label="Open navigation menu"
               aria-expanded={sidebarOpen}
@@ -172,17 +294,34 @@ export default function Layout({ children }: LayoutProps) {
               <Menu className="w-5 h-5" aria-hidden="true" />
             </Button>
             <div className="flex items-center gap-2">
-              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary">
-                <Zap className="w-4 h-4 text-primary-foreground" />
+              <div className="flex items-center justify-center w-8 h-8 rounded-lg gradient-violet shadow-lg shadow-violet/20">
+                <Zap className="w-4 h-4 text-white" />
               </div>
-              <span className="text-lg font-bold">LeadFlow Pro</span>
+              <span className="text-lg font-display font-bold text-gradient-primary">
+                LeadFlow
+              </span>
+              <span className="text-lg font-display font-bold text-foreground">
+                Pro
+              </span>
             </div>
           </header>
 
           {/* Page content */}
-          <main id="main-content" className="flex-1 overflow-auto" role="main" tabIndex={-1}>
-            <div className="container mx-auto px-4 py-6 lg:px-8 lg:py-8">
-              {children}
+          <main
+            id="main-content"
+            className="flex-1 overflow-auto"
+            role="main"
+            tabIndex={-1}
+          >
+            <div className="container mx-auto px-4 py-6 lg:px-8 lg:py-8 max-w-7xl">
+              <motion.div
+                key={location}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+              >
+                {children}
+              </motion.div>
             </div>
           </main>
         </div>

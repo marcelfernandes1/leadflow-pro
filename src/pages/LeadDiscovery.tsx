@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -18,6 +18,9 @@ import {
   ExternalLink,
   Loader2,
   AlertCircle,
+  Zap,
+  TrendingUp,
+  Sparkles,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -41,8 +44,17 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
 import { trpc } from '@/lib/trpc'
 import { useLeadStore } from '@/hooks/useLeadStore'
+import {
+  calculateLeadScore,
+  generateMockEnrichmentData,
+  getLeadCategory,
+  calculateOpportunityValue,
+  type ScoringResult,
+} from '@/lib/leadScoring'
+import { IntelligenceReportModal } from '@/components/IntelligenceReportModal'
 import type { Lead } from '@/types'
 
 const searchSchema = z.object({
@@ -70,14 +82,46 @@ export default function LeadDiscovery() {
   const [searchProgress, setSearchProgress] = useState(0)
   const [searchStatus, setSearchStatus] = useState('')
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
-  // useRealApi state removed - always using real API
+  const [proEnabled, setProEnabled] = useState(false)
+  const [isEnriching, setIsEnriching] = useState(false)
+  const [enrichProgress, setEnrichProgress] = useState(0)
+  const [leadScores, setLeadScores] = useState<Map<string, ScoringResult>>(new Map())
+  const [showReport, setShowReport] = useState(false)
+  const [reportLead, setReportLead] = useState<Lead | null>(null)
 
   const { discoveredLeads, setDiscoveredLeads, addToPipeline, setLastSearch } =
     useLeadStore()
 
+  // Enrich leads with Pro Intelligence scoring
+  const enrichLeads = async (leads: Lead[]) => {
+    setIsEnriching(true)
+    setEnrichProgress(0)
+    const newScores = new Map<string, ScoringResult>()
+
+    for (let i = 0; i < leads.length; i++) {
+      const lead = leads[i]
+      // Simulate API call delay
+      await new Promise((r) => setTimeout(r, 50))
+
+      // Generate mock enrichment data and calculate score
+      const enrichmentData = generateMockEnrichmentData(lead)
+      const scoringResult = calculateLeadScore(lead, enrichmentData)
+      newScores.set(lead.id, scoringResult)
+
+      setEnrichProgress(Math.round(((i + 1) / leads.length) * 100))
+    }
+
+    setLeadScores(newScores)
+    setIsEnriching(false)
+    toast.success('Pro Intelligence analysis complete!', {
+      description: `Analyzed ${leads.length} leads`,
+    })
+  }
+
   const searchMutation = trpc.leads.search.useMutation({
     onSuccess: (data) => {
-      setDiscoveredLeads(data.leads as Lead[])
+      const leads = data.leads as Lead[]
+      setDiscoveredLeads(leads)
       setSearchProgress(100)
 
       // Confetti celebration!
@@ -93,6 +137,11 @@ export default function LeadDiscovery() {
           ? 'Results served from cache'
           : 'Fresh results from Google Maps',
       })
+
+      // Auto-enrich if Pro is enabled
+      if (proEnabled && leads.length > 0) {
+        enrichLeads(leads)
+      }
     },
     onError: (error) => {
       toast.error('Search failed', {
@@ -151,6 +200,33 @@ export default function LeadDiscovery() {
   }
 
   const isSearching = searchMutation.isPending
+
+  // Sort leads by score when Pro is enabled
+  const sortedLeads = useMemo(() => {
+    if (!proEnabled || leadScores.size === 0) {
+      return discoveredLeads
+    }
+    return [...discoveredLeads].sort((a, b) => {
+      const scoreA = leadScores.get(a.id)?.totalScore ?? 0
+      const scoreB = leadScores.get(b.id)?.totalScore ?? 0
+      return scoreB - scoreA
+    })
+  }, [discoveredLeads, leadScores, proEnabled])
+
+  // Get score badge color based on category
+  const getScoreBadgeVariant = (score: number): 'hot' | 'default' | 'secondary' | 'outline' => {
+    const category = getLeadCategory(score)
+    switch (category) {
+      case 'hot':
+        return 'hot'
+      case 'warm':
+        return 'default'
+      case 'cold':
+        return 'secondary'
+      default:
+        return 'outline'
+    }
+  }
 
   return (
     <div className="space-y-8">
@@ -223,6 +299,33 @@ export default function LeadDiscovery() {
               </div>
             </div>
 
+            {/* Pro Intelligence Toggle */}
+            <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="pro-toggle" className="font-semibold cursor-pointer">
+                      Pro Intelligence
+                    </Label>
+                    <Badge variant="default" className="text-[10px] px-1.5 py-0">
+                      PRO
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Score leads, find tech gaps & get AI insights
+                  </p>
+                </div>
+              </div>
+              <Switch
+                id="pro-toggle"
+                checked={proEnabled}
+                onCheckedChange={setProEnabled}
+              />
+            </div>
+
             <motion.div
               whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.99 }}
@@ -272,6 +375,34 @@ export default function LeadDiscovery() {
         )}
       </AnimatePresence>
 
+      {/* Enrichment Progress */}
+      <AnimatePresence>
+        {isEnriching && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+          >
+            <Card className="border-primary/30 bg-gradient-to-r from-primary/5 to-primary/10">
+              <CardContent className="pt-6">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-primary animate-pulse" />
+                      <span className="text-primary font-medium">
+                        Analyzing leads with Pro Intelligence...
+                      </span>
+                    </div>
+                    <span className="font-medium">{enrichProgress}%</span>
+                  </div>
+                  <Progress value={enrichProgress} className="h-2" />
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Error State */}
       {searchMutation.isError && (
         <Card className="border-destructive">
@@ -290,41 +421,98 @@ export default function LeadDiscovery() {
       )}
 
       {/* Results */}
-      {discoveredLeads.length > 0 && (
+      {sortedLeads.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">
-              Found {discoveredLeads.length} leads
+              Found {sortedLeads.length} leads
+              {proEnabled && leadScores.size > 0 && (
+                <span className="text-sm font-normal text-muted-foreground ml-2">
+                  (sorted by score)
+                </span>
+              )}
             </h2>
+            {proEnabled && !isEnriching && discoveredLeads.length > 0 && leadScores.size === 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => enrichLeads(discoveredLeads)}
+                className="gap-2"
+              >
+                <Sparkles className="h-4 w-4" />
+                Analyze Leads
+              </Button>
+            )}
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {discoveredLeads.map((lead, index) => (
-              <motion.div
-                key={lead.id}
-                variants={cardVariants}
-                initial="hidden"
-                animate="visible"
-                custom={index}
-                whileHover={{ y: -4 }}
-                className="cursor-pointer"
-                onClick={() => setSelectedLead(lead)}
-              >
-                <Card className="h-full hover:shadow-lg transition-shadow">
-                  <CardHeader className="pb-3">
+            {sortedLeads.map((lead, index) => {
+              const scoringResult = leadScores.get(lead.id)
+              const opportunityValue = scoringResult
+                ? calculateOpportunityValue(scoringResult.opportunities)
+                : null
+              return (
+                <motion.div
+                  key={lead.id}
+                  variants={cardVariants}
+                  initial="hidden"
+                  animate="visible"
+                  custom={index}
+                  whileHover={{ y: -4 }}
+                  className="cursor-pointer"
+                  onClick={() => setSelectedLead(lead)}
+                >
+                  <Card className={`h-full hover:shadow-lg transition-shadow ${
+                    scoringResult && getLeadCategory(scoringResult.totalScore) === 'hot'
+                      ? 'ring-2 ring-orange-500/30'
+                      : ''
+                  }`}>
+                    <CardHeader className="pb-3">
                     <div className="flex items-start justify-between gap-2">
                       <CardTitle className="text-base line-clamp-1">
                         {lead.businessName}
                       </CardTitle>
-                      <Badge variant="secondary" className="shrink-0">
-                        {lead.category}
-                      </Badge>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {scoringResult && (
+                          <Badge
+                            variant={getScoreBadgeVariant(scoringResult.totalScore) as "default" | "secondary" | "destructive" | "outline"}
+                            className={`text-xs ${
+                              getLeadCategory(scoringResult.totalScore) === 'hot'
+                                ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white border-0'
+                                : getLeadCategory(scoringResult.totalScore) === 'warm'
+                                ? 'bg-amber-500 text-white border-0'
+                                : ''
+                            }`}
+                          >
+                            <Zap className="h-3 w-3 mr-0.5" />
+                            {scoringResult.totalScore}
+                          </Badge>
+                        )}
+                        <Badge variant="secondary" className="shrink-0">
+                          {lead.category}
+                        </Badge>
+                      </div>
                     </div>
                     <p className="text-sm text-muted-foreground">
                       {lead.city}, {lead.state}
                     </p>
                   </CardHeader>
                   <CardContent className="space-y-3">
+                    {/* Pro Intelligence Insights */}
+                    {scoringResult && opportunityValue && (
+                      <div className="flex items-center gap-2 p-2 rounded-md bg-primary/5 border border-primary/10">
+                        <TrendingUp className="h-4 w-4 text-primary" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-primary">
+                            ${opportunityValue.monthly}/mo opportunity
+                          </p>
+                          <p className="text-[10px] text-muted-foreground truncate">
+                            {scoringResult.opportunities.length} gap{scoringResult.opportunities.length !== 1 ? 's' : ''} found
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Rating */}
                     {lead.googleRating && (
                       <div className="flex items-center gap-1.5">
@@ -401,7 +589,8 @@ export default function LeadDiscovery() {
                   </CardContent>
                 </Card>
               </motion.div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
@@ -577,6 +766,20 @@ export default function LeadDiscovery() {
               </div>
 
               <div className="flex gap-3">
+                {proEnabled && leadScores.has(selectedLead.id) && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setReportLead(selectedLead)
+                      setShowReport(true)
+                      setSelectedLead(null)
+                    }}
+                    className="gap-2"
+                  >
+                    <Zap className="h-4 w-4" />
+                    View Report
+                  </Button>
+                )}
                 <Button
                   className="flex-1"
                   onClick={() => handleAddToPipeline(selectedLead)}
@@ -589,6 +792,18 @@ export default function LeadDiscovery() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Intelligence Report Modal */}
+      <IntelligenceReportModal
+        lead={reportLead}
+        scoringResult={reportLead ? leadScores.get(reportLead.id) || null : null}
+        open={showReport}
+        onOpenChange={(open) => {
+          setShowReport(open)
+          if (!open) setReportLead(null)
+        }}
+        onAddToPipeline={handleAddToPipeline}
+      />
     </div>
   )
 }
