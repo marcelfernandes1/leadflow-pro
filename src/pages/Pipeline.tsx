@@ -34,6 +34,7 @@ import {
   Square,
   Send,
   Download,
+  Tags,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -65,6 +66,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { exportLeadsToCSV } from '@/lib/export'
 import { Link } from 'wouter'
@@ -418,6 +428,7 @@ export default function Pipeline() {
     scheduleFollowUp,
     bulkUpdateStage,
     bulkDelete,
+    bulkAddTags,
   } = useLeadStore()
 
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -426,6 +437,8 @@ export default function Pipeline() {
   const [detailModalOpen, setDetailModalOpen] = useState(false)
   const [selectedLead, setSelectedLead] = useState<PipelineLead | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [tagDialogOpen, setTagDialogOpen] = useState(false)
+  const [bulkTagInput, setBulkTagInput] = useState('')
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -638,6 +651,23 @@ export default function Pipeline() {
     }
   }
 
+  const handleBulkTag = () => {
+    if (selectedLeads.size === 0 || !bulkTagInput.trim()) return
+
+    // Split by comma and trim each tag
+    const tags = bulkTagInput
+      .split(',')
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0)
+
+    if (tags.length === 0) return
+
+    bulkAddTags(Array.from(selectedLeads), tags)
+    setBulkTagInput('')
+    setTagDialogOpen(false)
+    toast.success(`Added ${tags.length} tag(s) to ${selectedLeads.size} leads`)
+  }
+
   const activeLead = activeId
     ? pipelineLeads.find((l) => l.pipelineId === activeId)
     : null
@@ -703,6 +733,14 @@ export default function Pipeline() {
                 ))}
               </SelectContent>
             </Select>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setTagDialogOpen(true)}
+            >
+              <Tags className="h-4 w-4 mr-2" />
+              Add Tags
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -837,6 +875,42 @@ export default function Pipeline() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Bulk Tag Dialog */}
+      <Dialog open={tagDialogOpen} onOpenChange={setTagDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Tags to {selectedLeads.size} Leads</DialogTitle>
+            <DialogDescription>
+              Enter tags separated by commas. Tags will be added to all selected leads.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              placeholder="e.g., hot-lead, follow-up, priority"
+              value={bulkTagInput}
+              onChange={(e) => setBulkTagInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleBulkTag()
+                }
+              }}
+            />
+            <p className="text-xs text-muted-foreground mt-2">
+              Separate multiple tags with commas
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTagDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleBulkTag} disabled={!bulkTagInput.trim()}>
+              <Tags className="h-4 w-4 mr-2" />
+              Add Tags
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

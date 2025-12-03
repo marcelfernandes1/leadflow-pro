@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   Search,
   Kanban,
+  BarChart3,
   Settings,
   Zap,
   Menu,
@@ -21,6 +22,7 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Discover Leads', href: '/discover', icon: Search },
   { name: 'Pipeline', href: '/pipeline', icon: Kanban },
+  { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   { name: 'Settings', href: '/settings', icon: Settings },
 ]
 
