@@ -4,10 +4,12 @@ import type { AppRouter } from '../../server/index'
 
 export const trpc = createTRPCReact<AppRouter>()
 
-export const trpcClient = trpc.createClient({
-  links: [
-    httpBatchLink({
-      url: '/api/trpc',
-    }),
-  ],
-})
+export function getTRPCClient() {
+  return trpc.createClient({
+    links: [
+      httpBatchLink({
+        url: 'http://localhost:3000/api/trpc',
+      }),
+    ],
+  })
+}

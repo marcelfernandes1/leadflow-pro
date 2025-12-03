@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import {
   DndContext,
@@ -23,75 +23,58 @@ import {
   GripVertical,
   Mail,
   Phone,
+  Globe,
+  Instagram,
   MoreHorizontal,
   Search,
+  Star,
+  Trash2,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { Link } from 'wouter'
+import { useLeadStore } from '@/hooks/useLeadStore'
+import type { PipelineStage, Lead } from '@/types'
 
-interface PipelineLead {
-  id: string
-  businessName: string
-  category: string
-  city: string
-  state: string
-  phone?: string
-  email?: string
-  lastContacted?: string
-  score?: number
+interface PipelineLead extends Lead {
+  pipelineId: string
+  stage: PipelineStage
+  addedAt: string
 }
 
-interface PipelineStage {
-  id: string
+interface StageConfig {
+  id: PipelineStage
   title: string
   color: string
-  leads: PipelineLead[]
 }
 
-const initialStages: PipelineStage[] = [
-  {
-    id: 'new',
-    title: 'New Leads',
-    color: 'bg-blue-500',
-    leads: [],
-  },
-  {
-    id: 'contacted',
-    title: 'Contacted',
-    color: 'bg-amber-500',
-    leads: [],
-  },
-  {
-    id: 'qualified',
-    title: 'Qualified',
-    color: 'bg-purple-500',
-    leads: [],
-  },
-  {
-    id: 'proposal',
-    title: 'Proposal',
-    color: 'bg-pink-500',
-    leads: [],
-  },
-  {
-    id: 'won',
-    title: 'Closed Won',
-    color: 'bg-green-500',
-    leads: [],
-  },
-  {
-    id: 'lost',
-    title: 'Closed Lost',
-    color: 'bg-gray-500',
-    leads: [],
-  },
+const stages: StageConfig[] = [
+  { id: 'new', title: 'New Leads', color: 'bg-blue-500' },
+  { id: 'contacted', title: 'Contacted', color: 'bg-amber-500' },
+  { id: 'qualified', title: 'Qualified', color: 'bg-purple-500' },
+  { id: 'proposal', title: 'Proposal', color: 'bg-pink-500' },
+  { id: 'negotiation', title: 'Negotiation', color: 'bg-orange-500' },
+  { id: 'won', title: 'Closed Won', color: 'bg-green-500' },
+  { id: 'lost', title: 'Closed Lost', color: 'bg-gray-500' },
 ]
 
-function SortableLeadCard({ lead }: { lead: PipelineLead }) {
+function SortableLeadCard({
+  lead,
+  onRemove,
+}: {
+  lead: PipelineLead
+  onRemove: () => void
+}) {
   const {
     attributes,
     listeners,
@@ -99,7 +82,7 @@ function SortableLeadCard({ lead }: { lead: PipelineLead }) {
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: lead.id })
+  } = useSortable({ id: lead.pipelineId })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -125,25 +108,35 @@ function SortableLeadCard({ lead }: { lead: PipelineLead }) {
           <p className="text-xs text-muted-foreground truncate">
             {lead.city}, {lead.state}
           </p>
+
+          {/* Rating */}
+          {lead.googleRating && (
+            <div className="flex items-center gap-1 mt-1">
+              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+              <span className="text-xs">{lead.googleRating.toFixed(1)}</span>
+            </div>
+          )}
+
           <div className="flex items-center gap-2 mt-2">
             <Badge variant="secondary" className="text-xs">
               {lead.category}
             </Badge>
-            {lead.score && (
+            {lead.leadScore && (
               <Badge
                 variant={
-                  lead.score >= 80
+                  lead.leadScore >= 80
                     ? 'hot'
-                    : lead.score >= 60
+                    : lead.leadScore >= 60
                       ? 'warm'
                       : 'cold'
                 }
                 className="text-xs"
               >
-                {lead.score}/100
+                {lead.leadScore}/100
               </Badge>
             )}
           </div>
+
           <div className="flex items-center gap-1 mt-2">
             {lead.email && (
               <Button
@@ -171,14 +164,60 @@ function SortableLeadCard({ lead }: { lead: PipelineLead }) {
                 <Phone className="h-3 w-3" />
               </Button>
             )}
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-6 w-6 ml-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <MoreHorizontal className="h-3 w-3" />
-            </Button>
+            {lead.website && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  window.open(lead.website, '_blank')
+                }}
+              >
+                <Globe className="h-3 w-3" />
+              </Button>
+            )}
+            {lead.instagram && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  window.open(
+                    `https://instagram.com/${lead.instagram?.replace('@', '')}`,
+                    '_blank'
+                  )
+                }}
+              >
+                <Instagram className="h-3 w-3" />
+              </Button>
+            )}
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6 ml-auto"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreHorizontal className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onRemove()
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Remove from Pipeline
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
@@ -186,7 +225,15 @@ function SortableLeadCard({ lead }: { lead: PipelineLead }) {
   )
 }
 
-function PipelineColumn({ stage }: { stage: PipelineStage }) {
+function PipelineColumn({
+  stage,
+  leads,
+  onRemoveLead,
+}: {
+  stage: StageConfig
+  leads: PipelineLead[]
+  onRemoveLead: (pipelineId: string) => void
+}) {
   return (
     <div className="flex-shrink-0 w-72">
       <Card className="h-full">
@@ -199,24 +246,28 @@ function PipelineColumn({ stage }: { stage: PipelineStage }) {
               </CardTitle>
             </div>
             <Badge variant="secondary" className="text-xs">
-              {stage.leads.length}
+              {leads.length}
             </Badge>
           </div>
         </CardHeader>
         <CardContent className="px-2 pb-2">
           <ScrollArea className="h-[calc(100vh-280px)]">
             <SortableContext
-              items={stage.leads.map((l) => l.id)}
+              items={leads.map((l) => l.pipelineId)}
               strategy={verticalListSortingStrategy}
             >
               <div className="space-y-2 p-2">
-                {stage.leads.length === 0 ? (
+                {leads.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground text-sm">
                     No leads in this stage
                   </div>
                 ) : (
-                  stage.leads.map((lead) => (
-                    <SortableLeadCard key={lead.id} lead={lead} />
+                  leads.map((lead) => (
+                    <SortableLeadCard
+                      key={lead.pipelineId}
+                      lead={lead}
+                      onRemove={() => onRemoveLead(lead.pipelineId)}
+                    />
                   ))
                 )}
               </div>
@@ -229,7 +280,7 @@ function PipelineColumn({ stage }: { stage: PipelineStage }) {
 }
 
 export default function Pipeline() {
-  const [stages, _setStages] = useState<PipelineStage[]>(initialStages)
+  const { pipelineLeads, updateLeadStage, removeFromPipeline } = useLeadStore()
   const [activeId, setActiveId] = useState<string | null>(null)
 
   const sensors = useSensors(
@@ -243,27 +294,72 @@ export default function Pipeline() {
     })
   )
 
+  // Group leads by stage
+  const leadsByStage = useMemo(() => {
+    const grouped: Record<PipelineStage, PipelineLead[]> = {
+      new: [],
+      contacted: [],
+      qualified: [],
+      proposal: [],
+      negotiation: [],
+      won: [],
+      lost: [],
+    }
+
+    pipelineLeads.forEach((lead) => {
+      if (grouped[lead.stage]) {
+        grouped[lead.stage].push(lead)
+      }
+    })
+
+    return grouped
+  }, [pipelineLeads])
+
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string)
   }
 
   const handleDragEnd = (event: DragEndEvent) => {
-    const { active: _active, over } = event
+    const { active, over } = event
     setActiveId(null)
 
     if (!over) return
 
-    // Handle drag and drop logic here
-    // For now, this is a placeholder
+    const activeId = active.id as string
+    const overId = over.id as string
+
+    // Find which stage the item was dropped into
+    const activeLead = pipelineLeads.find((l) => l.pipelineId === activeId)
+    if (!activeLead) return
+
+    // Check if dropped on a stage column
+    const targetStage = stages.find((s) => s.id === overId)
+    if (targetStage) {
+      if (activeLead.stage !== targetStage.id) {
+        updateLeadStage(activeId, targetStage.id)
+        toast.success(`Moved to ${targetStage.title}`)
+      }
+      return
+    }
+
+    // Check if dropped on another lead (find its stage)
+    const overLead = pipelineLeads.find((l) => l.pipelineId === overId)
+    if (overLead && activeLead.stage !== overLead.stage) {
+      updateLeadStage(activeId, overLead.stage)
+      toast.success(`Moved to ${stages.find((s) => s.id === overLead.stage)?.title}`)
+    }
+  }
+
+  const handleRemoveLead = (pipelineId: string) => {
+    removeFromPipeline(pipelineId)
+    toast.success('Removed from pipeline')
   }
 
   const activeLead = activeId
-    ? stages
-        .flatMap((s) => s.leads)
-        .find((l) => l.id === activeId)
+    ? pipelineLeads.find((l) => l.pipelineId === activeId)
     : null
 
-  const totalLeads = stages.reduce((sum, stage) => sum + stage.leads.length, 0)
+  const totalLeads = pipelineLeads.length
 
   return (
     <div className="space-y-6">
@@ -275,6 +371,11 @@ export default function Pipeline() {
             Track and manage your leads through the sales process
           </p>
         </div>
+        {totalLeads > 0 && (
+          <Badge variant="secondary" className="text-sm">
+            {totalLeads} leads in pipeline
+          </Badge>
+        )}
       </div>
 
       {/* Empty State */}
@@ -300,33 +401,40 @@ export default function Pipeline() {
       )}
 
       {/* Pipeline Kanban */}
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCorners}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {stages.map((stage) => (
-            <PipelineColumn key={stage.id} stage={stage} />
-          ))}
-        </div>
+      {totalLeads > 0 && (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="flex gap-4 overflow-x-auto pb-4">
+            {stages.map((stage) => (
+              <PipelineColumn
+                key={stage.id}
+                stage={stage}
+                leads={leadsByStage[stage.id]}
+                onRemoveLead={handleRemoveLead}
+              />
+            ))}
+          </div>
 
-        <DragOverlay>
-          {activeLead && (
-            <motion.div
-              initial={{ scale: 1 }}
-              animate={{ scale: 1.05, rotate: 3 }}
-              className="bg-card border rounded-lg p-3 shadow-lg w-64"
-            >
-              <h4 className="font-medium text-sm">{activeLead.businessName}</h4>
-              <p className="text-xs text-muted-foreground">
-                {activeLead.city}, {activeLead.state}
-              </p>
-            </motion.div>
-          )}
-        </DragOverlay>
-      </DndContext>
+          <DragOverlay>
+            {activeLead && (
+              <motion.div
+                initial={{ scale: 1 }}
+                animate={{ scale: 1.05, rotate: 3 }}
+                className="bg-card border rounded-lg p-3 shadow-lg w-64"
+              >
+                <h4 className="font-medium text-sm">{activeLead.businessName}</h4>
+                <p className="text-xs text-muted-foreground">
+                  {activeLead.city}, {activeLead.state}
+                </p>
+              </motion.div>
+            )}
+          </DragOverlay>
+        </DndContext>
+      )}
     </div>
   )
 }

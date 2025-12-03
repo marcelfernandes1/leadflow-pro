@@ -11,10 +11,13 @@ import {
   Phone,
   Globe,
   Instagram,
+  Facebook,
+  Linkedin,
   Star,
   Plus,
   ExternalLink,
   Loader2,
+  AlertCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -38,6 +41,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { trpc } from '@/lib/trpc'
+import { useLeadStore } from '@/hooks/useLeadStore'
+import type { Lead } from '@/types'
 
 const searchSchema = z.object({
   category: z.string().min(1, 'Please enter a business category'),
@@ -46,21 +52,6 @@ const searchSchema = z.object({
 })
 
 type SearchFormData = z.infer<typeof searchSchema>
-
-interface Lead {
-  id: string
-  businessName: string
-  category: string
-  address: string
-  city: string
-  state: string
-  phone?: string
-  email?: string
-  website?: string
-  instagram?: string
-  googleRating?: number
-  reviewCount?: number
-}
 
 const cardVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -76,11 +67,41 @@ const cardVariants = {
 }
 
 export default function LeadDiscovery() {
-  const [isSearching, setIsSearching] = useState(false)
   const [searchProgress, setSearchProgress] = useState(0)
   const [searchStatus, setSearchStatus] = useState('')
-  const [leads, setLeads] = useState<Lead[]>([])
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+  const [useRealApi, setUseRealApi] = useState(true)
+
+  const { discoveredLeads, setDiscoveredLeads, addToPipeline, setLastSearch } =
+    useLeadStore()
+
+  const searchMutation = trpc.leads.search.useMutation({
+    onSuccess: (data) => {
+      setDiscoveredLeads(data.leads as Lead[])
+      setSearchProgress(100)
+
+      // Confetti celebration!
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#3b82f6', '#10b981', '#f59e0b'],
+      })
+
+      toast.success(`🎉 Found ${data.count} leads!`, {
+        description: data.cached
+          ? 'Results served from cache'
+          : 'Fresh results from Google Maps',
+      })
+    },
+    onError: (error) => {
+      toast.error('Search failed', {
+        description: error.message,
+      })
+      setSearchProgress(0)
+      setSearchStatus('')
+    },
+  })
 
   const form = useForm<SearchFormData>({
     resolver: zodResolver(searchSchema),
@@ -91,64 +112,45 @@ export default function LeadDiscovery() {
     },
   })
 
-  const simulateSearch = async (data: SearchFormData) => {
-    setIsSearching(true)
-    setSearchProgress(0)
-    setLeads([])
-
-    // Simulate search progress
+  const simulateProgress = async () => {
     const statuses = [
       'Searching Google Maps...',
-      `Analyzing businesses in ${data.location}...`,
+      'Analyzing businesses...',
       'Extracting contact information...',
       'Validating data...',
     ]
 
     for (let i = 0; i < statuses.length; i++) {
       setSearchStatus(statuses[i])
-      setSearchProgress((i + 1) * 25)
-      await new Promise((r) => setTimeout(r, 800))
+      setSearchProgress((i + 1) * 20)
+      await new Promise((r) => setTimeout(r, 600))
     }
-
-    // Generate mock leads for now
-    const mockLeads: Lead[] = Array.from({ length: 12 }, (_, i) => ({
-      id: `lead-${i + 1}`,
-      businessName: `${data.category.charAt(0).toUpperCase() + data.category.slice(1)} Business ${i + 1}`,
-      category: data.category,
-      address: `${100 + i} Main Street`,
-      city: data.location.split(',')[0].trim(),
-      state: data.location.split(',')[1]?.trim() || 'FL',
-      phone: `+1-555-${String(1000 + i).padStart(4, '0')}`,
-      email: `contact@business${i + 1}.com`,
-      website: `https://business${i + 1}.com`,
-      instagram: `@business${i + 1}`,
-      googleRating: 3.5 + Math.random() * 1.5,
-      reviewCount: Math.floor(50 + Math.random() * 200),
-    }))
-
-    setLeads(mockLeads)
-    setIsSearching(false)
-    setSearchProgress(100)
-
-    // Confetti celebration!
-    confetti({
-      particleCount: 100,
-      spread: 70,
-      origin: { y: 0.6 },
-      colors: ['#3b82f6', '#10b981', '#f59e0b'],
-    })
-
-    toast.success(`🎉 Found ${mockLeads.length} leads in ${data.location}!`)
   }
 
-  const onSubmit = (data: SearchFormData) => {
-    simulateSearch(data)
+  const onSubmit = async (data: SearchFormData) => {
+    setSearchProgress(0)
+    setDiscoveredLeads([])
+    setLastSearch({ category: data.category, location: data.location })
+
+    // Start progress simulation
+    simulateProgress()
+
+    // Call real API
+    searchMutation.mutate({
+      category: data.category,
+      location: data.location,
+      minRating: data.minRating ? parseFloat(data.minRating) : undefined,
+      maxResults: 50,
+    })
   }
 
   const handleAddToPipeline = (lead: Lead) => {
+    addToPipeline(lead)
     toast.success(`✅ Added ${lead.businessName} to pipeline`)
     setSelectedLead(null)
   }
+
+  const isSearching = searchMutation.isPending
 
   return (
     <div className="space-y-8">
@@ -270,17 +272,34 @@ export default function LeadDiscovery() {
         )}
       </AnimatePresence>
 
+      {/* Error State */}
+      {searchMutation.isError && (
+        <Card className="border-destructive">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3 text-destructive">
+              <AlertCircle className="h-5 w-5" />
+              <div>
+                <p className="font-medium">Search failed</p>
+                <p className="text-sm opacity-80">
+                  {searchMutation.error.message}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Results */}
-      {leads.length > 0 && (
+      {discoveredLeads.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">
-              Found {leads.length} leads
+              Found {discoveredLeads.length} leads
             </h2>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {leads.map((lead, index) => (
+            {discoveredLeads.map((lead, index) => (
               <motion.div
                 key={lead.id}
                 variants={cardVariants}
@@ -313,9 +332,11 @@ export default function LeadDiscovery() {
                         <span className="text-sm font-medium">
                           {lead.googleRating.toFixed(1)}
                         </span>
-                        <span className="text-sm text-muted-foreground">
-                          ({lead.reviewCount} reviews)
-                        </span>
+                        {lead.reviewCount && (
+                          <span className="text-sm text-muted-foreground">
+                            ({lead.reviewCount} reviews)
+                          </span>
+                        )}
                       </div>
                     )}
 
@@ -428,8 +449,9 @@ export default function LeadDiscovery() {
                   <div>
                     <p className="font-medium">Address</p>
                     <p className="text-sm text-muted-foreground">
-                      {selectedLead.address}, {selectedLead.city},{' '}
-                      {selectedLead.state}
+                      {selectedLead.address && `${selectedLead.address}, `}
+                      {selectedLead.city}, {selectedLead.state}
+                      {selectedLead.zip && ` ${selectedLead.zip}`}
                     </p>
                   </div>
                 </div>
@@ -483,6 +505,7 @@ export default function LeadDiscovery() {
                   </div>
                 )}
 
+                {/* Social Media */}
                 {selectedLead.instagram && (
                   <div className="flex items-start gap-3">
                     <Instagram className="h-5 w-5 text-muted-foreground mt-0.5" />
@@ -501,6 +524,42 @@ export default function LeadDiscovery() {
                   </div>
                 )}
 
+                {selectedLead.facebook && (
+                  <div className="flex items-start gap-3">
+                    <Facebook className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="font-medium">Facebook</p>
+                      <a
+                        href={selectedLead.facebook}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-primary hover:underline flex items-center gap-1"
+                      >
+                        View Profile
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                {selectedLead.linkedin && (
+                  <div className="flex items-start gap-3">
+                    <Linkedin className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="font-medium">LinkedIn</p>
+                      <a
+                        href={selectedLead.linkedin}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-primary hover:underline flex items-center gap-1"
+                      >
+                        View Profile
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </div>
+                  </div>
+                )}
+
                 {/* Rating */}
                 {selectedLead.googleRating && (
                   <div className="flex items-start gap-3">
@@ -508,8 +567,9 @@ export default function LeadDiscovery() {
                     <div>
                       <p className="font-medium">Google Rating</p>
                       <p className="text-sm text-muted-foreground">
-                        {selectedLead.googleRating.toFixed(1)} stars (
-                        {selectedLead.reviewCount} reviews)
+                        {selectedLead.googleRating.toFixed(1)} stars
+                        {selectedLead.reviewCount &&
+                          ` (${selectedLead.reviewCount} reviews)`}
                       </p>
                     </div>
                   </div>
