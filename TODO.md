@@ -123,14 +123,14 @@ LeadFlow Pro is a lead generation and CRM platform for agencies with:
 - [x] Add "Schedule Follow-Up" button
 - [x] Implement date picker (HTML date input)
 - [x] Save follow-up date to store
-- [ ] Create follow-up reminders on dashboard
+- [x] Create follow-up reminders on dashboard
 
 ### 3.6 Bulk Actions
 - [x] Add checkboxes for multi-select
 - [x] Create bulk actions menu (Move to stage, Delete)
 - [ ] Add bulk tagging
-- [ ] Implement confirmation dialogs (shadcn/ui AlertDialog)
-- [ ] Add CSV export
+- [x] Implement confirmation dialogs (shadcn/ui AlertDialog)
+- [x] Add CSV export
 
 ### 3.7 Backend - CRM
 - [x] Create tRPC procedures for pipeline operations:
@@ -327,10 +327,10 @@ LeadFlow Pro is a lead generation and CRM platform for agencies with:
 
 ### 9.1 Dashboard Page
 - [x] Create main dashboard page
-- [x] Show key metrics (leads discovered, contacted, in pipeline)
-- [ ] Show follow-ups due today
-- [ ] Display recent activity feed
-- [x] Show subscription usage
+- [x] Show key metrics (leads discovered, contacted, in pipeline, won)
+- [x] Show follow-ups due (with overdue/today/tomorrow badges)
+- [x] Display recent activity feed
+- [x] Show pipeline overview with stage counts
 
 ### 9.2 Analytics (Recharts)
 - [ ] Lead discovery trends chart

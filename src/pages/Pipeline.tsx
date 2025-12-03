@@ -33,6 +33,7 @@ import {
   CheckSquare,
   Square,
   Send,
+  Download,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -54,7 +55,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
+import { exportLeadsToCSV } from '@/lib/export'
 import { Link } from 'wouter'
 import { useLeadStore } from '@/hooks/useLeadStore'
 import { ContactModal } from '@/components/ContactModal'
@@ -413,6 +425,7 @@ export default function Pipeline() {
   const [contactModalOpen, setContactModalOpen] = useState(false)
   const [detailModalOpen, setDetailModalOpen] = useState(false)
   const [selectedLead, setSelectedLead] = useState<PipelineLead | null>(null)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -603,9 +616,26 @@ export default function Pipeline() {
 
   const handleBulkDelete = () => {
     if (selectedLeads.size === 0) return
+    const count = selectedLeads.size
     bulkDelete(Array.from(selectedLeads))
     setSelectedLeads(new Set())
-    toast.success(`Removed ${selectedLeads.size} leads from pipeline`)
+    setDeleteConfirmOpen(false)
+    toast.success(`Removed ${count} leads from pipeline`)
+  }
+
+  const handleExportCSV = () => {
+    if (selectedLeads.size > 0) {
+      // Export selected leads
+      const leadsToExport = pipelineLeads.filter((l) =>
+        selectedLeads.has(l.pipelineId)
+      )
+      exportLeadsToCSV(leadsToExport, 'selected-leads')
+      toast.success(`Exported ${leadsToExport.length} leads`)
+    } else {
+      // Export all leads
+      exportLeadsToCSV(pipelineLeads, 'pipeline-leads')
+      toast.success(`Exported ${pipelineLeads.length} leads`)
+    }
   }
 
   const activeLead = activeId
@@ -626,9 +656,19 @@ export default function Pipeline() {
         </div>
         <div className="flex items-center gap-2">
           {totalLeads > 0 && (
-            <Badge variant="secondary" className="text-sm">
-              {totalLeads} leads in pipeline
-            </Badge>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportCSV}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export All
+              </Button>
+              <Badge variant="secondary" className="text-sm">
+                {totalLeads} leads in pipeline
+              </Badge>
+            </>
           )}
         </div>
       </div>
@@ -664,9 +704,17 @@ export default function Pipeline() {
               </SelectContent>
             </Select>
             <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportCSV}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </Button>
+            <Button
               variant="destructive"
               size="sm"
-              onClick={handleBulkDelete}
+              onClick={() => setDeleteConfirmOpen(true)}
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Delete Selected
@@ -767,6 +815,28 @@ export default function Pipeline() {
         onScheduleFollowUp={handleScheduleFollowUp}
         onStageChange={handleStageChange}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedLeads.size} leads?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently remove the
+              selected leads from your pipeline.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
