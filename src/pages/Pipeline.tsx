@@ -29,27 +29,54 @@ import {
   Search,
   Star,
   Trash2,
+  MessageSquare,
+  CheckSquare,
+  Square,
+  Send,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { Link } from 'wouter'
 import { useLeadStore } from '@/hooks/useLeadStore'
-import type { PipelineStage, Lead } from '@/types'
+import { ContactModal } from '@/components/ContactModal'
+import { LeadDetailModal } from '@/components/LeadDetailModal'
+import type { PipelineStage, Lead, ContactMethod } from '@/types'
 
 interface PipelineLead extends Lead {
   pipelineId: string
   stage: PipelineStage
   addedAt: string
+  notes?: string[]
+  tags?: string[]
+  activities?: Array<{
+    id: string
+    type: string
+    contactMethod?: string
+    details: string
+    createdAt: string
+  }>
+  nextFollowUpAt?: string
+  lastContactedAt?: string
+  lastContactMethod?: string
 }
 
 interface StageConfig {
@@ -70,10 +97,18 @@ const stages: StageConfig[] = [
 
 function SortableLeadCard({
   lead,
+  isSelected,
+  onSelect,
   onRemove,
+  onContact,
+  onViewDetails,
 }: {
   lead: PipelineLead
+  isSelected: boolean
+  onSelect: () => void
   onRemove: () => void
+  onContact: () => void
+  onViewDetails: () => void
 }) {
   const {
     attributes,
@@ -95,15 +130,35 @@ function SortableLeadCard({
       style={style}
       className={cn(
         'bg-card border rounded-lg p-3 cursor-grab active:cursor-grabbing',
-        isDragging && 'opacity-50 shadow-lg'
+        isDragging && 'opacity-50 shadow-lg',
+        isSelected && 'ring-2 ring-primary'
       )}
       whileHover={{ scale: 1.02 }}
       {...attributes}
       {...listeners}
     >
       <div className="flex items-start gap-2">
+        <div
+          className="mt-0.5 shrink-0"
+          onClick={(e) => {
+            e.stopPropagation()
+            onSelect()
+          }}
+        >
+          {isSelected ? (
+            <CheckSquare className="h-4 w-4 text-primary" />
+          ) : (
+            <Square className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors" />
+          )}
+        </div>
         <GripVertical className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-        <div className="flex-1 min-w-0">
+        <div
+          className="flex-1 min-w-0 cursor-pointer"
+          onClick={(e) => {
+            e.stopPropagation()
+            onViewDetails()
+          }}
+        >
           <h4 className="font-medium text-sm truncate">{lead.businessName}</h4>
           <p className="text-xs text-muted-foreground truncate">
             {lead.city}, {lead.state}
@@ -114,6 +169,22 @@ function SortableLeadCard({
             <div className="flex items-center gap-1 mt-1">
               <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
               <span className="text-xs">{lead.googleRating.toFixed(1)}</span>
+            </div>
+          )}
+
+          {/* Tags */}
+          {lead.tags && lead.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {lead.tags.slice(0, 2).map((tag) => (
+                <Badge key={tag} variant="outline" className="text-[10px] px-1 py-0">
+                  {tag}
+                </Badge>
+              ))}
+              {lead.tags.length > 2 && (
+                <Badge variant="outline" className="text-[10px] px-1 py-0">
+                  +{lead.tags.length - 2}
+                </Badge>
+              )}
             </div>
           )}
 
@@ -194,6 +265,19 @@ function SortableLeadCard({
               </Button>
             )}
 
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-6 w-6"
+              onClick={(e) => {
+                e.stopPropagation()
+                onContact()
+              }}
+              title="Track Contact"
+            >
+              <Send className="h-3 w-3" />
+            </Button>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -206,6 +290,25 @@ function SortableLeadCard({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onViewDetails()
+                  }}
+                >
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  View Details
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onContact()
+                  }}
+                >
+                  <Send className="h-4 w-4 mr-2" />
+                  Track Contact
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-destructive"
                   onClick={(e) => {
@@ -228,11 +331,19 @@ function SortableLeadCard({
 function PipelineColumn({
   stage,
   leads,
+  selectedLeads,
+  onSelectLead,
   onRemoveLead,
+  onContactLead,
+  onViewDetails,
 }: {
   stage: StageConfig
   leads: PipelineLead[]
+  selectedLeads: Set<string>
+  onSelectLead: (pipelineId: string) => void
   onRemoveLead: (pipelineId: string) => void
+  onContactLead: (lead: PipelineLead) => void
+  onViewDetails: (lead: PipelineLead) => void
 }) {
   return (
     <div className="flex-shrink-0 w-72">
@@ -266,7 +377,11 @@ function PipelineColumn({
                     <SortableLeadCard
                       key={lead.pipelineId}
                       lead={lead}
+                      isSelected={selectedLeads.has(lead.pipelineId)}
+                      onSelect={() => onSelectLead(lead.pipelineId)}
                       onRemove={() => onRemoveLead(lead.pipelineId)}
+                      onContact={() => onContactLead(lead)}
+                      onViewDetails={() => onViewDetails(lead)}
                     />
                   ))
                 )}
@@ -280,8 +395,24 @@ function PipelineColumn({
 }
 
 export default function Pipeline() {
-  const { pipelineLeads, updateLeadStage, removeFromPipeline } = useLeadStore()
+  const {
+    pipelineLeads,
+    updateLeadStage,
+    removeFromPipeline,
+    trackContact,
+    addNote,
+    addTag,
+    removeTag,
+    scheduleFollowUp,
+    bulkUpdateStage,
+    bulkDelete,
+  } = useLeadStore()
+
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set())
+  const [contactModalOpen, setContactModalOpen] = useState(false)
+  const [detailModalOpen, setDetailModalOpen] = useState(false)
+  const [selectedLead, setSelectedLead] = useState<PipelineLead | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -350,9 +481,131 @@ export default function Pipeline() {
     }
   }
 
+  const handleSelectLead = (pipelineId: string) => {
+    setSelectedLeads((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(pipelineId)) {
+        newSet.delete(pipelineId)
+      } else {
+        newSet.add(pipelineId)
+      }
+      return newSet
+    })
+  }
+
+  const handleSelectAll = () => {
+    if (selectedLeads.size === pipelineLeads.length) {
+      setSelectedLeads(new Set())
+    } else {
+      setSelectedLeads(new Set(pipelineLeads.map((l) => l.pipelineId)))
+    }
+  }
+
   const handleRemoveLead = (pipelineId: string) => {
     removeFromPipeline(pipelineId)
+    setSelectedLeads((prev) => {
+      const newSet = new Set(prev)
+      newSet.delete(pipelineId)
+      return newSet
+    })
     toast.success('Removed from pipeline')
+  }
+
+  const handleContactLead = (lead: PipelineLead) => {
+    setSelectedLead(lead)
+    setContactModalOpen(true)
+  }
+
+  const handleViewDetails = (lead: PipelineLead) => {
+    setSelectedLead(lead)
+    setDetailModalOpen(true)
+  }
+
+  const handleTrackContact = (method: ContactMethod, notes?: string) => {
+    if (selectedLead) {
+      trackContact(selectedLead.pipelineId, method, notes)
+      toast.success(`Contact tracked via ${method}`)
+    }
+  }
+
+  const handleAddNote = (note: string) => {
+    if (selectedLead) {
+      addNote(selectedLead.pipelineId, note)
+      // Update the selected lead to show the new note
+      const updatedLead = pipelineLeads.find(
+        (l) => l.pipelineId === selectedLead.pipelineId
+      )
+      if (updatedLead) {
+        setSelectedLead(updatedLead)
+      }
+      toast.success('Note added')
+    }
+  }
+
+  const handleAddTag = (tag: string) => {
+    if (selectedLead) {
+      addTag(selectedLead.pipelineId, tag)
+      const updatedLead = pipelineLeads.find(
+        (l) => l.pipelineId === selectedLead.pipelineId
+      )
+      if (updatedLead) {
+        setSelectedLead(updatedLead)
+      }
+      toast.success('Tag added')
+    }
+  }
+
+  const handleRemoveTag = (tag: string) => {
+    if (selectedLead) {
+      removeTag(selectedLead.pipelineId, tag)
+      const updatedLead = pipelineLeads.find(
+        (l) => l.pipelineId === selectedLead.pipelineId
+      )
+      if (updatedLead) {
+        setSelectedLead(updatedLead)
+      }
+      toast.success('Tag removed')
+    }
+  }
+
+  const handleScheduleFollowUp = (date: string, note?: string) => {
+    if (selectedLead) {
+      scheduleFollowUp(selectedLead.pipelineId, date, note)
+      const updatedLead = pipelineLeads.find(
+        (l) => l.pipelineId === selectedLead.pipelineId
+      )
+      if (updatedLead) {
+        setSelectedLead(updatedLead)
+      }
+      toast.success('Follow-up scheduled')
+    }
+  }
+
+  const handleStageChange = (stage: PipelineStage) => {
+    if (selectedLead) {
+      updateLeadStage(selectedLead.pipelineId, stage)
+      const updatedLead = pipelineLeads.find(
+        (l) => l.pipelineId === selectedLead.pipelineId
+      )
+      if (updatedLead) {
+        setSelectedLead({ ...updatedLead, stage })
+      }
+      toast.success(`Moved to ${stages.find((s) => s.id === stage)?.title}`)
+    }
+  }
+
+  const handleBulkMove = (stage: PipelineStage) => {
+    if (selectedLeads.size === 0) return
+    bulkUpdateStage(Array.from(selectedLeads), stage)
+    setSelectedLeads(new Set())
+    toast.success(`Moved ${selectedLeads.size} leads to ${stages.find((s) => s.id === stage)?.title}`)
+  }
+
+  const handleBulkDelete = () => {
+    if (selectedLeads.size === 0) return
+    bulkDelete(Array.from(selectedLeads))
+    setSelectedLeads(new Set())
+    toast.success(`Removed ${selectedLeads.size} leads from pipeline`)
   }
 
   const activeLead = activeId
@@ -371,12 +624,63 @@ export default function Pipeline() {
             Track and manage your leads through the sales process
           </p>
         </div>
-        {totalLeads > 0 && (
-          <Badge variant="secondary" className="text-sm">
-            {totalLeads} leads in pipeline
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          {totalLeads > 0 && (
+            <Badge variant="secondary" className="text-sm">
+              {totalLeads} leads in pipeline
+            </Badge>
+          )}
+        </div>
       </div>
+
+      {/* Bulk Actions Bar */}
+      {selectedLeads.size > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          className="flex items-center gap-4 p-3 bg-muted rounded-lg"
+        >
+          <div className="flex items-center gap-2">
+            <Checkbox
+              checked={selectedLeads.size === pipelineLeads.length}
+              onCheckedChange={handleSelectAll}
+            />
+            <span className="text-sm font-medium">
+              {selectedLeads.size} selected
+            </span>
+          </div>
+          <div className="flex items-center gap-2 ml-auto">
+            <Select onValueChange={(value) => handleBulkMove(value as PipelineStage)}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Move to..." />
+              </SelectTrigger>
+              <SelectContent>
+                {stages.map((stage) => (
+                  <SelectItem key={stage.id} value={stage.id}>
+                    {stage.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleBulkDelete}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Selected
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelectedLeads(new Set())}
+            >
+              Clear Selection
+            </Button>
+          </div>
+        </motion.div>
+      )}
 
       {/* Empty State */}
       {totalLeads === 0 && (
@@ -414,7 +718,11 @@ export default function Pipeline() {
                 key={stage.id}
                 stage={stage}
                 leads={leadsByStage[stage.id]}
+                selectedLeads={selectedLeads}
+                onSelectLead={handleSelectLead}
                 onRemoveLead={handleRemoveLead}
+                onContactLead={handleContactLead}
+                onViewDetails={handleViewDetails}
               />
             ))}
           </div>
@@ -435,6 +743,30 @@ export default function Pipeline() {
           </DragOverlay>
         </DndContext>
       )}
+
+      {/* Contact Modal */}
+      <ContactModal
+        open={contactModalOpen}
+        onOpenChange={setContactModalOpen}
+        lead={selectedLead}
+        onContact={handleTrackContact}
+      />
+
+      {/* Lead Detail Modal */}
+      <LeadDetailModal
+        open={detailModalOpen}
+        onOpenChange={setDetailModalOpen}
+        lead={selectedLead}
+        onContact={(method) => {
+          // Open the contact URL and show tracking confirmation
+          handleTrackContact(method)
+        }}
+        onAddNote={handleAddNote}
+        onAddTag={handleAddTag}
+        onRemoveTag={handleRemoveTag}
+        onScheduleFollowUp={handleScheduleFollowUp}
+        onStageChange={handleStageChange}
+      />
     </div>
   )
 }

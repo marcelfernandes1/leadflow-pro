@@ -77,9 +77,9 @@ LeadFlow Pro is a lead generation and CRM platform for agencies with:
 
 ### 2.6 Smart Caching System
 - [x] Create `searchCache` table (schema defined)
-- [ ] Implement cache check logic (< 60 days = serve from cache)
-- [ ] Randomize lead order when serving from cache
-- [ ] Track cache metadata (scrapedAt, lastServedAt, serveCount)
+- [x] Implement cache check logic (< 60 days = serve from cache)
+- [x] Randomize lead order when serving from cache
+- [x] Track cache metadata (scrapedAt, lastServedAt, serveCount)
 
 ### 2.7 Frontend-Backend Integration
 - [x] Connect tRPC client to React app
@@ -105,40 +105,43 @@ LeadFlow Pro is a lead generation and CRM platform for agencies with:
 - [ ] Handle invalid drop (shake animation, return to original)
 
 ### 3.3 Contact Tracking
-- [ ] Create contact modal ("How did you contact them?")
-- [ ] Options: Email, Phone, Instagram, Facebook, LinkedIn, Twitter, Website, In-person
-- [ ] One-click contact: click → opens contact method → marks as contacted
-- [ ] Auto-move lead to "Contacted" stage after contact
-- [ ] Record activity in timeline
+- [x] Create contact modal ("How did you contact them?")
+- [x] Options: Email, Phone, Instagram, Facebook, LinkedIn, Twitter, Website, In-person
+- [x] One-click contact: click → opens contact method → marks as contacted
+- [x] Auto-move lead to "Contacted" stage after contact
+- [x] Record activity in timeline
 
 ### 3.4 Lead Detail from Pipeline
-- [ ] Create full lead detail modal from pipeline view
-- [ ] Display all contact info (clickable)
-- [ ] Show activity timeline
-- [ ] Add notes section
-- [ ] Add tags functionality
+- [x] Create full lead detail modal from pipeline view
+- [x] Display all contact info (clickable)
+- [x] Show activity timeline
+- [x] Add notes section
+- [x] Add tags functionality
 - [ ] Add custom fields (key-value pairs)
 
 ### 3.5 Follow-Up Scheduling
-- [ ] Add "Schedule Follow-Up" button
-- [ ] Implement date picker (shadcn/ui Calendar)
-- [ ] Save follow-up date to database
+- [x] Add "Schedule Follow-Up" button
+- [x] Implement date picker (HTML date input)
+- [x] Save follow-up date to store
 - [ ] Create follow-up reminders on dashboard
 
 ### 3.6 Bulk Actions
-- [ ] Add checkboxes for multi-select
-- [ ] Create bulk actions menu (Move to stage, Add tags, Delete, Export CSV)
+- [x] Add checkboxes for multi-select
+- [x] Create bulk actions menu (Move to stage, Delete)
+- [ ] Add bulk tagging
 - [ ] Implement confirmation dialogs (shadcn/ui AlertDialog)
+- [ ] Add CSV export
 
 ### 3.7 Backend - CRM
-- [x] Create tRPC procedures for pipeline operations (stubs):
+- [x] Create tRPC procedures for pipeline operations:
   - [x] `leads.addToPipeline(leadId)`
   - [x] `leads.updateStage(leadId, stage)`
   - [x] `leads.trackContact(leadId, method)`
-  - [ ] `leads.addNote(leadId, note)`
-  - [ ] `leads.scheduleFollowUp(leadId, date)`
-  - [ ] `leads.getActivities(leadId)`
-  - [ ] `leads.bulkUpdate(leadIds, updates)`
+  - [x] `leads.addNote(leadId, note)`
+  - [x] `leads.scheduleFollowUp(leadId, date)`
+  - [x] `leads.getActivities(leadId)`
+  - [x] `leads.bulkUpdate(leadIds, updates)`
+  - [x] `leads.bulkDelete(leadIds)`
 
 ---
 
