@@ -1,11 +1,14 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { User, CreditCard, Bell, Shield, Zap } from 'lucide-react'
+import { User, CreditCard, Bell, Shield, Zap, Mail, Calendar, TrendingUp, MessageSquare } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
+import { Switch } from '@/components/ui/switch'
+import { toast } from 'sonner'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -28,7 +31,35 @@ const itemVariants = {
   },
 }
 
+interface NotificationSettings {
+  followUpReminders: boolean
+  dailyDigest: boolean
+  newLeadAlerts: boolean
+  pipelineUpdates: boolean
+  weeklyReport: boolean
+}
+
 export default function Settings() {
+  const [notifications, setNotifications] = useState<NotificationSettings>({
+    followUpReminders: true,
+    dailyDigest: false,
+    newLeadAlerts: true,
+    pipelineUpdates: true,
+    weeklyReport: false,
+  })
+
+  const handleNotificationChange = (key: keyof NotificationSettings) => {
+    setNotifications((prev) => {
+      const newValue = !prev[key]
+      toast.success(
+        newValue
+          ? 'Notification enabled'
+          : 'Notification disabled'
+      )
+      return { ...prev, [key]: newValue }
+    })
+  }
+
   return (
     <motion.div
       variants={containerVariants}
@@ -232,10 +263,124 @@ export default function Settings() {
               Manage your notification preferences
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Notification settings coming soon...
-            </p>
+          <CardContent className="space-y-6">
+            {/* Follow-up Reminders */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Calendar className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <Label htmlFor="followup-reminders" className="font-medium">
+                    Follow-up Reminders
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Get notified when follow-ups are due
+                  </p>
+                </div>
+              </div>
+              <Switch
+                id="followup-reminders"
+                checked={notifications.followUpReminders}
+                onCheckedChange={() => handleNotificationChange('followUpReminders')}
+              />
+            </div>
+
+            <Separator />
+
+            {/* New Lead Alerts */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-green-500/10">
+                  <TrendingUp className="h-4 w-4 text-green-500" />
+                </div>
+                <div>
+                  <Label htmlFor="new-lead-alerts" className="font-medium">
+                    New Lead Alerts
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Notifications when new leads are added
+                  </p>
+                </div>
+              </div>
+              <Switch
+                id="new-lead-alerts"
+                checked={notifications.newLeadAlerts}
+                onCheckedChange={() => handleNotificationChange('newLeadAlerts')}
+              />
+            </div>
+
+            <Separator />
+
+            {/* Pipeline Updates */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-amber-500/10">
+                  <MessageSquare className="h-4 w-4 text-amber-500" />
+                </div>
+                <div>
+                  <Label htmlFor="pipeline-updates" className="font-medium">
+                    Pipeline Updates
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Stage changes and activity updates
+                  </p>
+                </div>
+              </div>
+              <Switch
+                id="pipeline-updates"
+                checked={notifications.pipelineUpdates}
+                onCheckedChange={() => handleNotificationChange('pipelineUpdates')}
+              />
+            </div>
+
+            <Separator />
+
+            {/* Daily Digest */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-blue-500/10">
+                  <Mail className="h-4 w-4 text-blue-500" />
+                </div>
+                <div>
+                  <Label htmlFor="daily-digest" className="font-medium">
+                    Daily Digest
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Daily email summary of your pipeline
+                  </p>
+                </div>
+              </div>
+              <Switch
+                id="daily-digest"
+                checked={notifications.dailyDigest}
+                onCheckedChange={() => handleNotificationChange('dailyDigest')}
+              />
+            </div>
+
+            <Separator />
+
+            {/* Weekly Report */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-purple-500/10">
+                  <TrendingUp className="h-4 w-4 text-purple-500" />
+                </div>
+                <div>
+                  <Label htmlFor="weekly-report" className="font-medium">
+                    Weekly Report
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Weekly analytics and performance report
+                  </p>
+                </div>
+              </div>
+              <Switch
+                id="weekly-report"
+                checked={notifications.weeklyReport}
+                onCheckedChange={() => handleNotificationChange('weeklyReport')}
+              />
+            </div>
           </CardContent>
         </Card>
       </motion.div>
