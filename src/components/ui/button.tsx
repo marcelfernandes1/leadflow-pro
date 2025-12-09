@@ -4,37 +4,35 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  'group relative inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-40 disabled:shadow-none',
   {
     variants: {
       variant: {
         default:
-          'bg-gradient-to-r from-violet to-primary text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:scale-[1.02] active:scale-[0.98] before:absolute before:inset-0 before:rounded-[inherit] before:bg-gradient-to-r before:from-white/20 before:to-transparent before:opacity-0 before:transition-opacity hover:before:opacity-100',
+          'bg-primary text-primary-foreground shadow-md hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98]',
         destructive:
-          'bg-gradient-to-r from-rose to-destructive text-destructive-foreground shadow-lg shadow-destructive/25 hover:shadow-xl hover:shadow-destructive/30 hover:scale-[1.02] active:scale-[0.98]',
+          'bg-destructive text-white shadow-md hover:bg-destructive/90 hover:shadow-lg hover:shadow-destructive/20 active:scale-[0.98]',
         outline:
-          'border border-border bg-transparent hover:bg-white/5 hover:border-primary/50 hover:text-primary hover:shadow-lg hover:shadow-primary/10 active:scale-[0.98]',
+          'border border-border bg-transparent hover:bg-surface hover:border-primary/40 active:scale-[0.98]',
         secondary:
-          'bg-secondary text-secondary-foreground hover:bg-secondary/80 hover:scale-[1.02] active:scale-[0.98]',
+          'bg-secondary text-secondary-foreground hover:bg-secondary/80 active:scale-[0.98]',
         ghost:
-          'hover:bg-white/5 hover:text-foreground active:scale-[0.98]',
+          'hover:bg-surface hover:text-foreground active:scale-[0.98]',
         link:
-          'text-primary underline-offset-4 hover:underline hover:text-primary/80',
+          'text-primary underline-offset-4 hover:underline',
         glow:
-          'bg-gradient-to-r from-violet via-cyan to-emerald text-white shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] animate-pulse-glow',
-        glass:
-          'glass text-foreground hover:bg-white/10 hover:border-white/20 hover:scale-[1.02] active:scale-[0.98]',
+          'bg-primary text-white shadow-glow-brand hover:shadow-lg animate-pulse-glow active:scale-[0.98]',
         success:
-          'bg-gradient-to-r from-emerald to-success text-success-foreground shadow-lg shadow-success/25 hover:shadow-xl hover:shadow-success/30 hover:scale-[1.02] active:scale-[0.98]',
+          'bg-success text-white shadow-md hover:bg-success/90 hover:shadow-lg active:scale-[0.98]',
       },
       size: {
-        default: 'h-11 px-5 py-2.5 rounded-lg',
-        sm: 'h-9 px-4 rounded-md text-xs',
-        lg: 'h-12 px-8 rounded-xl text-base',
-        xl: 'h-14 px-10 rounded-xl text-lg',
+        default: 'h-10 px-4 py-2 rounded-lg',
+        sm: 'h-8 px-3 rounded-md text-xs',
+        lg: 'h-11 px-6 rounded-lg',
+        xl: 'h-12 px-8 rounded-lg text-base',
         icon: 'h-10 w-10 rounded-lg',
         'icon-sm': 'h-8 w-8 rounded-md',
-        'icon-lg': 'h-12 w-12 rounded-xl',
+        'icon-lg': 'h-12 w-12 rounded-lg',
       },
     },
     defaultVariants: {

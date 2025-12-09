@@ -3,32 +3,34 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const badgeVariants = cva(
-  'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+  'inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium transition-colors',
   {
     variants: {
       variant: {
         default:
-          'border-transparent bg-primary/20 text-primary backdrop-blur-sm',
+          'border-primary/30 bg-primary/10 text-primary',
         secondary:
-          'border-border/50 bg-secondary/50 text-secondary-foreground backdrop-blur-sm',
+          'border-border bg-secondary text-secondary-foreground',
         destructive:
-          'border-transparent bg-destructive/20 text-destructive backdrop-blur-sm',
+          'border-destructive/30 bg-destructive/10 text-destructive',
         outline:
-          'border-border/50 text-foreground bg-transparent',
+          'border-border text-muted-foreground',
         success:
-          'border-transparent bg-success/20 text-success backdrop-blur-sm',
+          'border-success/30 bg-success/10 text-success',
         warning:
-          'border-transparent bg-warning/20 text-warning backdrop-blur-sm',
+          'border-warning/30 bg-warning/10 text-warning',
+        // Heat badges - MUST POP for lead scoring
         hot:
-          'border-transparent gradient-hot text-white shadow-lg shadow-rose/20 animate-pulse',
+          'border-hot/30 bg-hot/10 text-hot font-semibold',
         warm:
-          'border-transparent gradient-warm text-white shadow-lg shadow-amber/20',
+          'border-warm/30 bg-warm/10 text-warm font-semibold',
         cold:
-          'border-transparent gradient-cold text-white shadow-lg shadow-cyan/20',
-        glass:
-          'border-white/10 bg-white/5 text-foreground backdrop-blur-md',
+          'border-cold/30 bg-cold/10 text-cold font-semibold',
+        // Special variants
         glow:
-          'border-transparent bg-gradient-to-r from-violet to-cyan text-white shadow-lg shadow-violet/30',
+          'border-primary/40 bg-primary/15 text-primary shadow-sm shadow-primary/20',
+        glass:
+          'border-border/40 bg-white/5 text-foreground backdrop-blur-md',
       },
     },
     defaultVariants: {

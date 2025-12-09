@@ -1,11 +1,24 @@
 import { z } from 'zod'
-import { router, publicProcedure } from '../trpc.js'
+import { router, publicProcedure, protectedProcedure } from '../trpc.js'
 import { searchLeads } from '../services/apify.js'
 import { checkCache, saveToCache, getCacheStats } from '../services/cache.js'
+import { enrichLead, bulkEnrichLeads } from '../services/enrichment.js'
+import { calculateLeadScore, getLeadCategory, calculateOpportunityValue } from '../services/scoring.js'
+import { searchHighIntentBusinesses, getServiceTypes, getUSStates } from '../services/highIntentSearch.js'
+
+// Simple XSS sanitization - remove script tags and dangerous attributes
+function sanitizeText(text: string): string {
+  return text
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/on\w+\s*=/gi, '')
+    .replace(/javascript:/gi, '')
+    .trim()
+}
 
 // In-memory storage for development (will use database in production)
 interface StoredLead {
   id: string
+  userId: string // Added for user isolation
   businessName: string
   category: string
   address?: string
@@ -43,49 +56,41 @@ const pipelineLeads = new Map<string, StoredLead>()
 
 export const leadsRouter = router({
   // Search for leads using Google Maps
+  // Now searches the entire region with contact & social enrichment built-in
   search: publicProcedure
     .input(
       z.object({
         category: z.string().min(1),
         location: z.string().min(1),
-        minRating: z.number().optional(),
-        maxResults: z.number().default(100),
       })
     )
     .mutation(async ({ input }) => {
-      const { category, location, minRating, maxResults } = input
+      const { category, location } = input
 
-      // Check cache first
-      const cached = checkCache(category, location)
+      console.log('[Search] Starting search for:', category, 'in', location)
+
+      // Check cache first (now async with database)
+      const cached = await checkCache(category, location)
       if (cached) {
-        let leads = cached.leads
-
-        // Apply filters to cached results
-        if (minRating) {
-          leads = leads.filter(
-            (lead) => lead.googleRating && lead.googleRating >= minRating
-          )
-        }
-
-        // Limit results
-        leads = leads.slice(0, maxResults)
-
+        console.log('[Search] Cache hit! Found', cached.leads.length, 'leads')
         return {
-          leads,
-          count: leads.length,
+          leads: cached.leads,
+          count: cached.leads.length,
           cached: true,
         }
       }
 
-      // Search using Apify
+      console.log('[Search] Cache miss, searching via Apify...')
+
+      // Search using Apify - no limits, full region search with enrichment
       const leads = await searchLeads({
         searchQuery: `${category} in ${location}`,
-        maxResults,
-        minRating,
       })
 
-      // Save to cache
-      saveToCache(category, location, leads)
+      console.log('[Search] Found', leads.length, 'leads from Apify')
+
+      // Save to cache (now async with database)
+      await saveToCache(category, location, leads)
 
       return {
         leads,
@@ -95,19 +100,24 @@ export const leadsRouter = router({
     }),
 
   // Get cache statistics
-  getCacheStats: publicProcedure.query(() => {
-    return getCacheStats()
+  getCacheStats: publicProcedure.query(async () => {
+    return await getCacheStats()
   }),
 
-  // Get a single lead by ID
-  getById: publicProcedure
+  // Get a single lead by ID (requires authentication)
+  getById: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .query(({ input }) => {
-      return pipelineLeads.get(input.id) || null
+    .query(({ input, ctx }) => {
+      const lead = pipelineLeads.get(input.id)
+      // Only return lead if it belongs to the authenticated user
+      if (!lead || lead.userId !== ctx.userId) {
+        return null
+      }
+      return lead
     }),
 
-  // Add lead to pipeline
-  addToPipeline: publicProcedure
+  // Add lead to pipeline (requires authentication)
+  addToPipeline: protectedProcedure
     .input(
       z.object({
         lead: z.object({
@@ -128,13 +138,16 @@ export const leadsRouter = router({
         }),
       })
     )
-    .mutation(({ input }) => {
+    .mutation(({ input, ctx }) => {
       const id = `lead-${Date.now()}-${Math.random().toString(36).slice(2)}`
       const now = new Date().toISOString()
 
       const storedLead: StoredLead = {
         ...input.lead,
+        businessName: sanitizeText(input.lead.businessName),
+        category: sanitizeText(input.lead.category),
         id,
+        userId: ctx.userId!, // Associate lead with user
         stage: 'new',
         notes: [],
         tags: [],
@@ -159,16 +172,21 @@ export const leadsRouter = router({
       }
     }),
 
-  // Remove lead from pipeline
-  removeFromPipeline: publicProcedure
+  // Remove lead from pipeline (requires authentication)
+  removeFromPipeline: protectedProcedure
     .input(z.object({ leadId: z.string() }))
-    .mutation(({ input }) => {
+    .mutation(({ input, ctx }) => {
+      const lead = pipelineLeads.get(input.leadId)
+      // Check ownership before deleting
+      if (!lead || lead.userId !== ctx.userId) {
+        return { success: false }
+      }
       const deleted = pipelineLeads.delete(input.leadId)
       return { success: deleted }
     }),
 
-  // Update lead stage
-  updateStage: publicProcedure
+  // Update lead stage (requires authentication)
+  updateStage: protectedProcedure
     .input(
       z.object({
         leadId: z.string(),
@@ -183,9 +201,9 @@ export const leadsRouter = router({
         ]),
       })
     )
-    .mutation(({ input }) => {
+    .mutation(({ input, ctx }) => {
       const lead = pipelineLeads.get(input.leadId)
-      if (!lead) {
+      if (!lead || lead.userId !== ctx.userId) {
         return { success: false, error: 'Lead not found' }
       }
 
@@ -204,8 +222,8 @@ export const leadsRouter = router({
       return { success: true, lead }
     }),
 
-  // Track contact with lead
-  trackContact: publicProcedure
+  // Track contact with lead (requires authentication)
+  trackContact: protectedProcedure
     .input(
       z.object({
         leadId: z.string(),
@@ -223,9 +241,9 @@ export const leadsRouter = router({
         autoMoveToContacted: z.boolean().default(true),
       })
     )
-    .mutation(({ input }) => {
+    .mutation(({ input, ctx }) => {
       const lead = pipelineLeads.get(input.leadId)
-      if (!lead) {
+      if (!lead || lead.userId !== ctx.userId) {
         return { success: false, error: 'Lead not found' }
       }
 
@@ -234,12 +252,12 @@ export const leadsRouter = router({
       lead.lastContactMethod = input.method
       lead.updatedAt = now
 
-      // Add activity
+      // Add activity with sanitized notes
       lead.activities.push({
         id: `activity-${Date.now()}`,
         type: 'contacted',
         contactMethod: input.method,
-        details: input.notes || `Contacted via ${input.method}`,
+        details: input.notes ? sanitizeText(input.notes) : `Contacted via ${input.method}`,
         createdAt: now,
       })
 
@@ -257,58 +275,60 @@ export const leadsRouter = router({
       return { success: true, lead }
     }),
 
-  // Add note to lead
-  addNote: publicProcedure
+  // Add note to lead (requires authentication)
+  addNote: protectedProcedure
     .input(
       z.object({
         leadId: z.string(),
         note: z.string().min(1),
       })
     )
-    .mutation(({ input }) => {
+    .mutation(({ input, ctx }) => {
       const lead = pipelineLeads.get(input.leadId)
-      if (!lead) {
+      if (!lead || lead.userId !== ctx.userId) {
         return { success: false, error: 'Lead not found' }
       }
 
       const now = new Date().toISOString()
-      lead.notes.push(input.note)
+      const sanitizedNote = sanitizeText(input.note)
+      lead.notes.push(sanitizedNote)
       lead.updatedAt = now
 
       // Add activity
       lead.activities.push({
         id: `activity-${Date.now()}`,
         type: 'note_added',
-        details: input.note,
+        details: sanitizedNote,
         createdAt: now,
       })
 
       return { success: true, lead }
     }),
 
-  // Add tag to lead
-  addTag: publicProcedure
+  // Add tag to lead (requires authentication)
+  addTag: protectedProcedure
     .input(
       z.object({
         leadId: z.string(),
-        tag: z.string().min(1),
+        tag: z.string().min(1).max(50), // Limit tag length
       })
     )
-    .mutation(({ input }) => {
+    .mutation(({ input, ctx }) => {
       const lead = pipelineLeads.get(input.leadId)
-      if (!lead) {
+      if (!lead || lead.userId !== ctx.userId) {
         return { success: false, error: 'Lead not found' }
       }
 
-      if (!lead.tags.includes(input.tag)) {
-        lead.tags.push(input.tag)
+      const sanitizedTag = sanitizeText(input.tag)
+      if (!lead.tags.includes(sanitizedTag)) {
+        lead.tags.push(sanitizedTag)
         lead.updatedAt = new Date().toISOString()
 
         // Add activity
         lead.activities.push({
           id: `activity-${Date.now()}`,
           type: 'tag_added',
-          details: `Tag "${input.tag}" added`,
+          details: `Tag "${sanitizedTag}" added`,
           createdAt: new Date().toISOString(),
         })
       }
@@ -316,17 +336,17 @@ export const leadsRouter = router({
       return { success: true, lead }
     }),
 
-  // Remove tag from lead
-  removeTag: publicProcedure
+  // Remove tag from lead (requires authentication)
+  removeTag: protectedProcedure
     .input(
       z.object({
         leadId: z.string(),
         tag: z.string(),
       })
     )
-    .mutation(({ input }) => {
+    .mutation(({ input, ctx }) => {
       const lead = pipelineLeads.get(input.leadId)
-      if (!lead) {
+      if (!lead || lead.userId !== ctx.userId) {
         return { success: false, error: 'Lead not found' }
       }
 
@@ -336,8 +356,8 @@ export const leadsRouter = router({
       return { success: true, lead }
     }),
 
-  // Schedule follow-up
-  scheduleFollowUp: publicProcedure
+  // Schedule follow-up (requires authentication)
+  scheduleFollowUp: protectedProcedure
     .input(
       z.object({
         leadId: z.string(),
@@ -345,9 +365,9 @@ export const leadsRouter = router({
         note: z.string().optional(),
       })
     )
-    .mutation(({ input }) => {
+    .mutation(({ input, ctx }) => {
       const lead = pipelineLeads.get(input.leadId)
-      if (!lead) {
+      if (!lead || lead.userId !== ctx.userId) {
         return { success: false, error: 'Lead not found' }
       }
 
@@ -355,23 +375,23 @@ export const leadsRouter = router({
       lead.nextFollowUpAt = input.date
       lead.updatedAt = now
 
-      // Add activity
+      // Add activity with sanitized note
       lead.activities.push({
         id: `activity-${Date.now()}`,
         type: 'follow_up_scheduled',
-        details: input.note || `Follow-up scheduled for ${new Date(input.date).toLocaleDateString()}`,
+        details: input.note ? sanitizeText(input.note) : `Follow-up scheduled for ${new Date(input.date).toLocaleDateString()}`,
         createdAt: now,
       })
 
       return { success: true, lead }
     }),
 
-  // Get activities for a lead
-  getActivities: publicProcedure
+  // Get activities for a lead (requires authentication)
+  getActivities: protectedProcedure
     .input(z.object({ leadId: z.string() }))
-    .query(({ input }) => {
+    .query(({ input, ctx }) => {
       const lead = pipelineLeads.get(input.leadId)
-      if (!lead) {
+      if (!lead || lead.userId !== ctx.userId) {
         return []
       }
       return lead.activities.sort(
@@ -379,8 +399,8 @@ export const leadsRouter = router({
       )
     }),
 
-  // Get pipeline leads
-  getPipeline: publicProcedure.query(() => {
+  // Get pipeline leads (requires authentication - returns only user's leads)
+  getPipeline: protectedProcedure.query(({ ctx }) => {
     const result: Record<string, StoredLead[]> = {
       new: [],
       contacted: [],
@@ -391,20 +411,24 @@ export const leadsRouter = router({
       lost: [],
     }
 
+    // Only return leads belonging to the authenticated user
     pipelineLeads.forEach((lead) => {
-      result[lead.stage].push(lead)
+      if (lead.userId === ctx.userId) {
+        result[lead.stage].push(lead)
+      }
     })
 
     return result
   }),
 
-  // Get leads due for follow-up
-  getFollowUpsDue: publicProcedure.query(() => {
+  // Get leads due for follow-up (requires authentication - returns only user's leads)
+  getFollowUpsDue: protectedProcedure.query(({ ctx }) => {
     const now = new Date()
     const dueLeads: StoredLead[] = []
 
+    // Only return leads belonging to the authenticated user
     pipelineLeads.forEach((lead) => {
-      if (lead.nextFollowUpAt && new Date(lead.nextFollowUpAt) <= now) {
+      if (lead.userId === ctx.userId && lead.nextFollowUpAt && new Date(lead.nextFollowUpAt) <= now) {
         dueLeads.push(lead)
       }
     })
@@ -415,8 +439,8 @@ export const leadsRouter = router({
     })
   }),
 
-  // Bulk update leads
-  bulkUpdate: publicProcedure
+  // Bulk update leads (requires authentication)
+  bulkUpdate: protectedProcedure
     .input(
       z.object({
         leadIds: z.array(z.string()),
@@ -432,18 +456,19 @@ export const leadsRouter = router({
               'lost',
             ])
             .optional(),
-          tags: z.array(z.string()).optional(),
+          tags: z.array(z.string().max(50)).optional(),
         }),
       })
     )
-    .mutation(({ input }) => {
+    .mutation(({ input, ctx }) => {
       const { leadIds, updates } = input
       const updatedLeads: StoredLead[] = []
       const now = new Date().toISOString()
 
       leadIds.forEach((id) => {
         const lead = pipelineLeads.get(id)
-        if (lead) {
+        // Only update leads belonging to the authenticated user
+        if (lead && lead.userId === ctx.userId) {
           if (updates.stage) {
             const oldStage = lead.stage
             lead.stage = updates.stage
@@ -457,8 +482,9 @@ export const leadsRouter = router({
 
           if (updates.tags) {
             updates.tags.forEach((tag) => {
-              if (!lead.tags.includes(tag)) {
-                lead.tags.push(tag)
+              const sanitizedTag = sanitizeText(tag)
+              if (!lead.tags.includes(sanitizedTag)) {
+                lead.tags.push(sanitizedTag)
               }
             })
           }
@@ -475,15 +501,19 @@ export const leadsRouter = router({
       }
     }),
 
-  // Bulk delete leads
-  bulkDelete: publicProcedure
+  // Bulk delete leads (requires authentication)
+  bulkDelete: protectedProcedure
     .input(z.object({ leadIds: z.array(z.string()) }))
-    .mutation(({ input }) => {
+    .mutation(({ input, ctx }) => {
       let deletedCount = 0
 
       input.leadIds.forEach((id) => {
-        if (pipelineLeads.delete(id)) {
-          deletedCount++
+        const lead = pipelineLeads.get(id)
+        // Only delete leads belonging to the authenticated user
+        if (lead && lead.userId === ctx.userId) {
+          if (pipelineLeads.delete(id)) {
+            deletedCount++
+          }
         }
       })
 
@@ -493,21 +523,278 @@ export const leadsRouter = router({
       }
     }),
 
-  // Enrich lead with intelligence (Pro feature)
-  enrich: publicProcedure
+  // Enrich lead with intelligence (Pro feature - requires authentication)
+  enrich: protectedProcedure
     .input(z.object({ leadId: z.string() }))
-    .mutation(async ({ input: _input }) => {
-      // TODO: Implement lead enrichment
-      // 1. Detect technology stack
-      // 2. Check for job postings
-      // 3. Calculate lead score
-      // 4. Generate AI insights
-      return {
-        success: true,
-        score: 0,
-        technologies: [],
-        opportunities: [],
-        insights: [],
+    .mutation(async ({ input, ctx }) => {
+      const lead = pipelineLeads.get(input.leadId)
+      if (!lead || lead.userId !== ctx.userId) {
+        return { success: false, error: 'Lead not found' }
+      }
+
+      try {
+        // Run enrichment
+        const enrichment = await enrichLead(lead.website, lead.businessName)
+
+        // Calculate lead score
+        const scoring = calculateLeadScore(enrichment, {
+          businessName: lead.businessName,
+          googleRating: lead.googleRating,
+          reviewCount: lead.reviewCount,
+        })
+
+        // Get lead category and opportunity value
+        const category = getLeadCategory(scoring.totalScore)
+        const opportunityValue = calculateOpportunityValue(scoring.opportunities)
+
+        return {
+          success: true,
+          leadId: input.leadId,
+          score: scoring.totalScore,
+          category,
+          breakdown: scoring.breakdown,
+          technologies: enrichment.technologies,
+          opportunities: scoring.opportunities,
+          opportunityValue,
+          growthSignals: scoring.growthSignals,
+          insights: scoring.insights,
+          pitchRecommendation: scoring.pitchRecommendation,
+          websiteAnalysis: enrichment.websiteAnalysis,
+          domainInfo: enrichment.domainInfo,
+          employeeCount: enrichment.employeeCount,
+          fundingInfo: enrichment.fundingInfo,
+          enrichedAt: enrichment.enrichedAt,
+        }
+      } catch (error) {
+        console.error('Error enriching lead:', error)
+        return {
+          success: false,
+          error: 'Failed to enrich lead',
+        }
+      }
+    }),
+
+  // Enrich a discovered lead (before adding to pipeline) - available to all users
+  // Note: Email discovery is free. Tech stack + scoring is Pro only (handled in frontend)
+  // Google Maps ratings/reviews are the primary data source - no separate Yelp/Facebook scraping
+  enrichDiscoveredLead: publicProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        businessName: z.string(),
+        website: z.string().optional(),
+        // Email from Google Maps scraper - skip email discovery if present
+        email: z.string().optional(),
+        googleRating: z.number().optional(),
+        reviewCount: z.number().optional(),
+        // Social media URLs from Google Maps scraper
+        instagram: z.string().optional(),
+        facebook: z.string().optional(),
+        linkedin: z.string().optional(),
+        twitter: z.string().optional(),
+        tiktok: z.string().optional(),
+        youtube: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      console.log('\n**** [leads.ts] enrichDiscoveredLead called ****')
+      console.log('[leads.ts] Input:', JSON.stringify(input, null, 2))
+      try {
+        console.log('[leads.ts] Calling enrichLead service...')
+        console.log('[leads.ts] Existing email from Google Maps:', input.email || 'NONE')
+        console.log('[leads.ts] Social media from Google Maps:', {
+          instagram: input.instagram,
+          facebook: input.facebook,
+          linkedin: input.linkedin,
+          twitter: input.twitter,
+          tiktok: input.tiktok,
+          youtube: input.youtube,
+        })
+        const enrichment = await enrichLead(input.website, input.businessName, {
+          // Pass existing email - skip email scraping if present
+          existingEmail: input.email,
+        })
+
+        console.log('[leads.ts] Enrichment complete!')
+        console.log('[leads.ts] Email enrichment:', JSON.stringify(enrichment.emailEnrichment, null, 2))
+        console.log('[leads.ts] Social metrics:', JSON.stringify(enrichment.socialMetrics, null, 2))
+        console.log('[leads.ts] Technologies found:', enrichment.technologies?.length || 0)
+
+        const scoring = calculateLeadScore(enrichment, {
+          businessName: input.businessName,
+          googleRating: input.googleRating,
+          reviewCount: input.reviewCount,
+        })
+
+        const category = getLeadCategory(scoring.totalScore)
+        const opportunityValue = calculateOpportunityValue(scoring.opportunities)
+
+        return {
+          success: true,
+          leadId: input.id,
+          score: scoring.totalScore,
+          category,
+          breakdown: scoring.breakdown,
+          technologies: enrichment.technologies,
+          techSignals: enrichment.techSignals,
+          opportunities: scoring.opportunities,
+          opportunityValue,
+          growthSignals: scoring.growthSignals,
+          insights: scoring.insights,
+          pitchRecommendation: scoring.pitchRecommendation,
+          websiteAnalysis: enrichment.websiteAnalysis,
+          domainInfo: enrichment.domainInfo,
+          socialMetrics: enrichment.socialMetrics,
+          // Email enrichment data
+          emailEnrichment: enrichment.emailEnrichment,
+          employeeCount: enrichment.employeeCount,
+          fundingInfo: enrichment.fundingInfo,
+          jobPostings: enrichment.jobPostings,
+          enrichedAt: enrichment.enrichedAt,
+          // Preserve social media from Google Maps scraper
+          socialMedia: {
+            instagram: input.instagram,
+            facebook: input.facebook,
+            linkedin: input.linkedin,
+            twitter: input.twitter,
+            tiktok: input.tiktok,
+            youtube: input.youtube,
+          },
+        }
+      } catch (error) {
+        console.error('Error enriching discovered lead:', error)
+        return {
+          success: false,
+          error: 'Failed to enrich lead',
+        }
+      }
+    }),
+
+  // Bulk enrich multiple leads (Pro feature - requires authentication)
+  bulkEnrich: protectedProcedure
+    .input(z.object({ leadIds: z.array(z.string()) }))
+    .mutation(async ({ input, ctx }) => {
+      const leads: Array<{ id: string; website?: string; businessName: string }> = []
+
+      // Gather lead info for enrichment - only for user's own leads
+      input.leadIds.forEach((id) => {
+        const lead = pipelineLeads.get(id)
+        if (lead && lead.userId === ctx.userId) {
+          leads.push({
+            id: lead.id,
+            website: lead.website,
+            businessName: lead.businessName,
+          })
+        }
+      })
+
+      if (leads.length === 0) {
+        return {
+          success: false,
+          error: 'No valid leads found',
+          results: [],
+        }
+      }
+
+      try {
+        // Run bulk enrichment
+        const enrichmentResults = await bulkEnrichLeads(leads)
+
+        // Process results and calculate scores
+        const results: Array<{
+          leadId: string
+          score: number
+          category: 'hot' | 'warm' | 'cold' | 'low'
+          opportunityValue: { monthly: number; yearly: number }
+        }> = []
+
+        enrichmentResults.forEach((enrichment, leadId) => {
+          const lead = pipelineLeads.get(leadId)
+          if (lead) {
+            const scoring = calculateLeadScore(enrichment, {
+              businessName: lead.businessName,
+              googleRating: lead.googleRating,
+              reviewCount: lead.reviewCount,
+            })
+
+            const category = getLeadCategory(scoring.totalScore)
+            const opportunityValue = calculateOpportunityValue(scoring.opportunities)
+
+            results.push({
+              leadId,
+              score: scoring.totalScore,
+              category,
+              opportunityValue,
+            })
+          }
+        })
+
+        return {
+          success: true,
+          totalProcessed: results.length,
+          results,
+        }
+      } catch (error) {
+        console.error('Error bulk enriching leads:', error)
+        return {
+          success: false,
+          error: 'Failed to bulk enrich leads',
+          results: [],
+        }
+      }
+    }),
+
+  // ==========================================
+  // HIGH-INTENT BUSINESS SEARCH (Premium Feature)
+  // Find businesses actively hiring = high buying intent
+  // ==========================================
+
+  // Get service types for high-intent search dropdown
+  getHighIntentServiceTypes: publicProcedure.query(() => {
+    return getServiceTypes()
+  }),
+
+  // Get US states for high-intent search dropdown
+  getHighIntentStates: publicProcedure.query(() => {
+    return getUSStates()
+  }),
+
+  // Search for high-intent businesses (Premium - uses 3 credits per search)
+  searchHighIntent: protectedProcedure
+    .input(
+      z.object({
+        state: z.string().min(1, 'State is required'),
+        industry: z.string().min(1, 'Industry is required'),
+        serviceType: z.string().min(1, 'Service type is required'),
+        maxResultsPerSource: z.number().min(5).max(50).default(15),
+      })
+    )
+    .mutation(async ({ input }) => {
+      console.log('[leads.ts] searchHighIntent called with:', input)
+
+      try {
+        const result = await searchHighIntentBusinesses(
+          input.state,
+          input.industry,
+          input.serviceType,
+          input.maxResultsPerSource
+        )
+
+        return {
+          success: true,
+          ...result,
+        }
+      } catch (error: any) {
+        console.error('[leads.ts] High-intent search error:', error)
+        return {
+          success: false,
+          error: error.message || 'Failed to search for high-intent businesses',
+          businesses: [],
+          searchedAt: new Date().toISOString(),
+          query: input,
+          sources: { indeed: 0, upwork: 0, linkedin: 0 },
+          creditsUsed: 0,
+        }
       }
     }),
 })

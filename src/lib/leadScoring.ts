@@ -61,6 +61,12 @@ export interface EnrichmentData {
   fundingAmount?: number
 }
 
+export interface TechnologyInfo {
+  name: string
+  category: string
+  detected: boolean
+}
+
 export interface ScoringResult {
   totalScore: number
   breakdown: ScoreBreakdown
@@ -68,6 +74,8 @@ export interface ScoringResult {
   growthSignals: GrowthSignal[]
   insights: string[]
   pitchRecommendation: string
+  technologies: TechnologyInfo[]
+  enrichmentData?: EnrichmentData
 }
 
 /**
@@ -130,6 +138,26 @@ export function calculateLeadScore(
     totalScore
   )
 
+  // Build technology info from enrichment data
+  const technologyInfo: TechnologyInfo[] = enrichmentData.technologies.map((tech) => {
+    const techLower = tech.toLowerCase()
+    let category = 'Other'
+    Object.entries(TECHNOLOGY_VALUES).forEach(([key, value]) => {
+      if (techLower.includes(key)) {
+        category = value.category
+      }
+    })
+    return { name: tech, category, detected: true }
+  })
+
+  // Add missing essential categories as "not detected"
+  ESSENTIAL_CATEGORIES.forEach((cat) => {
+    const hasCategory = technologyInfo.some((t) => t.category === cat)
+    if (!hasCategory) {
+      technologyInfo.push({ name: cat, category: cat, detected: false })
+    }
+  })
+
   return {
     totalScore,
     breakdown,
@@ -137,6 +165,8 @@ export function calculateLeadScore(
     growthSignals,
     insights,
     pitchRecommendation,
+    technologies: technologyInfo,
+    enrichmentData,
   }
 }
 
@@ -410,46 +440,33 @@ export function calculateOpportunityValue(opportunities: Opportunity[]): {
 }
 
 /**
- * Generate mock enrichment data for demo purposes
- * This simulates what would come from real API integrations
+ * Convert backend enrichment result to frontend EnrichmentData format
  */
-export function generateMockEnrichmentData(lead: Lead): EnrichmentData {
-  // Simulate some randomness in the data
-  const hasWebsite = !!lead.website
-  const hasSocial = !!(lead.instagram || lead.facebook || lead.linkedin)
-
-  const technologies: string[] = []
-
-  // Randomly assign some technologies
-  if (Math.random() > 0.6) technologies.push('Google Analytics')
-  if (Math.random() > 0.7) technologies.push('WordPress')
-  if (Math.random() > 0.8) technologies.push('Mailchimp')
-  if (Math.random() > 0.85) technologies.push('HubSpot')
-  if (Math.random() > 0.9) technologies.push('Intercom')
-
+export function convertEnrichmentResult(result: {
+  technologies?: Array<{ name: string; category: string }>
+  jobPostings?: Array<{ title: string; date: string; source: string }>
+  websiteAnalysis?: { performanceScore: number; isMobileFriendly: boolean } | null
+  domainInfo?: { age: number } | null
+  employeeCount?: number | null
+  fundingInfo?: { hasRecentFunding: boolean; amount?: number } | null
+  socialMetrics?: {
+    instagram?: { followers: number; following: number; mediaCount: number; isBusiness: boolean }
+    facebook?: { rating?: number; reviewCount?: number; likes?: number; followers?: number }
+    yelp?: { rating: number; reviewCount: number }
+  } | null
+}): EnrichmentData {
   return {
-    technologies,
-    domainAge: hasWebsite ? Math.floor(Math.random() * 10) + 1 : undefined,
-    employeeCount: Math.floor(Math.random() * 100) + 5,
-    jobPostings: Math.random() > 0.7
-      ? [
-          {
-            title: 'Sales Representative',
-            date: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
-            source: 'Indeed',
-          },
-        ]
-      : [],
-    performanceScore: hasWebsite ? Math.floor(Math.random() * 60) + 40 : undefined,
-    isMobileFriendly: hasWebsite ? Math.random() > 0.3 : undefined,
-    socialFollowers: hasSocial
-      ? {
-          instagram: lead.instagram ? Math.floor(Math.random() * 10000) : undefined,
-          facebook: lead.facebook ? Math.floor(Math.random() * 5000) : undefined,
-          linkedin: lead.linkedin ? Math.floor(Math.random() * 2000) : undefined,
-        }
-      : undefined,
-    hasRecentFunding: Math.random() > 0.9,
-    fundingAmount: Math.random() > 0.9 ? Math.floor(Math.random() * 5000000) + 500000 : undefined,
+    technologies: result.technologies?.map(t => t.name) || [],
+    domainAge: result.domainInfo?.age,
+    employeeCount: result.employeeCount ?? undefined,
+    jobPostings: result.jobPostings || [],
+    performanceScore: result.websiteAnalysis?.performanceScore,
+    isMobileFriendly: result.websiteAnalysis?.isMobileFriendly,
+    hasRecentFunding: result.fundingInfo?.hasRecentFunding || false,
+    fundingAmount: result.fundingInfo?.amount,
+    socialFollowers: result.socialMetrics ? {
+      instagram: result.socialMetrics.instagram?.followers,
+      facebook: result.socialMetrics.facebook?.followers,
+    } : undefined,
   }
 }

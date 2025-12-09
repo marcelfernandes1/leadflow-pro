@@ -11,12 +11,94 @@ export interface Lead {
   phone?: string
   email?: string
   website?: string
+
+  // Social media links
   instagram?: string
   facebook?: string
   linkedin?: string
   twitter?: string
+  tiktok?: string
+  youtube?: string
+
+  // Email verification
+  emailVerified?: boolean
+  emailVerificationScore?: number
+  emailVerificationStatus?: 'valid' | 'invalid' | 'catchall' | 'disposable' | 'unknown'
+
+  // Google reviews
   googleRating?: number
   reviewCount?: number
+
+  // Yelp data
+  yelpRating?: number
+  yelpReviewCount?: number
+
+  // Facebook page data
+  facebookRating?: number
+  facebookReviewCount?: number
+
+  // Instagram metrics
+  instagramMetrics?: {
+    followers: number
+    following: number
+    mediaCount: number
+    isBusiness: boolean
+    profileUrl?: string
+  }
+
+  // Facebook page metrics
+  facebookMetrics?: {
+    rating?: number
+    reviewCount?: number
+    likes?: number
+    followers?: number
+    pageUrl?: string
+  }
+
+  // LinkedIn company metrics
+  linkedinMetrics?: {
+    followers: number
+    employeeCount?: number
+    companyUrl: string
+  }
+
+  // Twitter metrics
+  twitterMetrics?: {
+    followers: number
+    following: number
+    tweets: number
+    profileUrl: string
+    verified?: boolean
+  }
+
+  // TikTok metrics
+  tiktokMetrics?: {
+    followers: number
+    likes: number
+    videos: number
+    profileUrl: string
+  }
+
+  // YouTube metrics
+  youtubeMetrics?: {
+    subscribers: number
+    videos: number
+    views: number
+    channelUrl: string
+  }
+
+  // Technology signals
+  techSignals?: {
+    hasFacebookPixel: boolean
+    hasSchema: boolean
+    hasGoogleRemarketing: boolean
+    hasGoogleAnalytics: boolean
+    hasLinkedInAnalytics: boolean
+    usesWordPress: boolean
+    usesShopify: boolean
+    isMobileFriendly: boolean
+  }
+
   businessHours?: Record<string, string>
   photos?: string[]
 

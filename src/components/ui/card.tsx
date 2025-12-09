@@ -4,25 +4,27 @@ import { cn } from '@/lib/utils'
 const Card = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement> & {
-    variant?: 'default' | 'glass' | 'elevated' | 'gradient'
+    variant?: 'default' | 'surface' | 'elevated' | 'interactive' | 'glass'
     hover?: boolean
   }
 >(({ className, variant = 'default', hover = false, ...props }, ref) => (
   <div
     ref={ref}
     className={cn(
-      'rounded-xl text-card-foreground transition-all duration-300',
+      'rounded-xl text-card-foreground',
       {
-        // Default variant - solid elevated card
-        'bg-card border border-border/50 shadow-glass': variant === 'default',
-        // Glass variant - frosted glass effect
-        'glass-prominent': variant === 'glass',
-        // Elevated variant - more prominent shadow
-        'bg-card border border-border/50 shadow-elevated': variant === 'elevated',
-        // Gradient variant - subtle gradient border
-        'bg-card border-gradient': variant === 'gradient',
-        // Hover effects
-        'card-hover': hover,
+        // Default - glass card with backdrop blur
+        'bg-card/70 backdrop-blur-xl border border-border/50 shadow-md': variant === 'default',
+        // Surface - subtle glass
+        'bg-surface/50 backdrop-blur-lg border border-border/30': variant === 'surface',
+        // Elevated - more prominent glass
+        'bg-card/80 backdrop-blur-xl border border-border/60 shadow-lg': variant === 'elevated',
+        // Glass - frosted glass effect
+        'bg-card/60 backdrop-blur-2xl border border-border/40 shadow-md shadow-black/20': variant === 'glass',
+        // Interactive - for clickable cards
+        'bg-card/70 backdrop-blur-xl border border-border/50 shadow-md transition-all duration-200 cursor-pointer hover:shadow-lg hover:border-primary/30 hover:-translate-y-0.5 hover:bg-card/80 active:translate-y-0': variant === 'interactive',
+        // Hover effects for non-interactive cards
+        'transition-all duration-200 hover:shadow-lg hover:border-primary/30 hover:-translate-y-0.5': hover && variant !== 'interactive',
       },
       className
     )}
@@ -50,7 +52,7 @@ const CardTitle = React.forwardRef<
   <h3
     ref={ref}
     className={cn(
-      'font-display text-xl font-bold leading-none tracking-tight',
+      'text-lg font-semibold leading-none tracking-tight',
       className
     )}
     {...props}

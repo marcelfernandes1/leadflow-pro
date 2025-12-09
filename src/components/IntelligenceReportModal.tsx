@@ -23,6 +23,9 @@ import {
   ArrowUpRight,
   Briefcase,
   Activity,
+  Layers,
+  Check,
+  X,
 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -214,6 +217,48 @@ export function IntelligenceReportModal({
               </div>
             </div>
           </div>
+
+          {/* Technology Stack */}
+          {scoringResult.technologies && scoringResult.technologies.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Layers className="h-4 w-4" />
+                Technology Stack
+              </h3>
+              <div className="grid grid-cols-2 gap-2">
+                {scoringResult.technologies.map((tech, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: index * 0.05 }}
+                    className={`flex items-center justify-between p-2.5 rounded-lg border ${
+                      tech.detected
+                        ? 'bg-green-500/5 border-green-500/20'
+                        : 'bg-red-500/5 border-red-500/20'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      {tech.detected ? (
+                        <Check className="h-3.5 w-3.5 text-green-500" />
+                      ) : (
+                        <X className="h-3.5 w-3.5 text-red-500" />
+                      )}
+                      <span className="text-sm font-medium">{tech.name}</span>
+                    </div>
+                    <Badge
+                      variant="secondary"
+                      className={`text-2xs ${
+                        tech.detected ? 'text-green-600' : 'text-red-600'
+                      }`}
+                    >
+                      {tech.category}
+                    </Badge>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <Separator />
 

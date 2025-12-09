@@ -28,11 +28,32 @@ export interface PipelineLead extends Lead {
   lastContactMethod?: ContactMethod
 }
 
+export interface SavedLead extends Lead {
+  savedAt: string
+  searchQuery?: { category: string; location: string }
+}
+
+export interface SearchHistoryEntry {
+  id: string
+  category: string
+  location: string
+  minRating?: number
+  leads: Lead[]
+  searchedAt: string
+}
+
 interface LeadStore {
-  // Discovered leads (from search)
+  // Discovered leads (from search - not persisted)
   discoveredLeads: Lead[]
   setDiscoveredLeads: (leads: Lead[]) => void
   clearDiscoveredLeads: () => void
+
+  // Saved leads (persisted)
+  savedLeads: SavedLead[]
+  saveLead: (lead: Lead, searchQuery?: { category: string; location: string }) => void
+  unsaveLead: (leadId: string) => void
+  isLeadSaved: (leadId: string) => boolean
+  clearSavedLeads: () => void
 
   // Pipeline leads
   pipelineLeads: PipelineLead[]
@@ -69,6 +90,11 @@ interface LeadStore {
   // Search history
   lastSearch: { category: string; location: string } | null
   setLastSearch: (search: { category: string; location: string }) => void
+  searchHistory: SearchHistoryEntry[]
+  addSearchToHistory: (search: { category: string; location: string; minRating?: number; leads: Lead[] }) => void
+  removeSearchFromHistory: (id: string) => void
+  clearSearchHistory: () => void
+  findExistingSearch: (category: string, location: string) => SearchHistoryEntry | undefined
 }
 
 export const useLeadStore = create<LeadStore>()(
@@ -78,6 +104,28 @@ export const useLeadStore = create<LeadStore>()(
       discoveredLeads: [],
       setDiscoveredLeads: (leads) => set({ discoveredLeads: leads }),
       clearDiscoveredLeads: () => set({ discoveredLeads: [] }),
+
+      // Saved leads
+      savedLeads: [],
+      saveLead: (lead, searchQuery) => {
+        const existing = get().savedLeads.find((l) => l.id === lead.id)
+        if (existing) return // Already saved
+
+        const savedLead: SavedLead = {
+          ...lead,
+          savedAt: new Date().toISOString(),
+          searchQuery,
+        }
+        set((state) => ({
+          savedLeads: [savedLead, ...state.savedLeads],
+        }))
+      },
+      unsaveLead: (leadId) =>
+        set((state) => ({
+          savedLeads: state.savedLeads.filter((l) => l.id !== leadId),
+        })),
+      isLeadSaved: (leadId) => get().savedLeads.some((l) => l.id === leadId),
+      clearSavedLeads: () => set({ savedLeads: [] }),
 
       // Pipeline leads
       pipelineLeads: [],
@@ -359,12 +407,42 @@ export const useLeadStore = create<LeadStore>()(
       // Search history
       lastSearch: null,
       setLastSearch: (search) => set({ lastSearch: search }),
+      searchHistory: [],
+      addSearchToHistory: (search) => {
+        const entry: SearchHistoryEntry = {
+          id: `search-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          category: search.category,
+          location: search.location,
+          minRating: search.minRating,
+          leads: search.leads,
+          searchedAt: new Date().toISOString(),
+        }
+        set((state) => ({
+          searchHistory: [entry, ...state.searchHistory].slice(0, 30), // Keep last 30 searches
+        }))
+      },
+      removeSearchFromHistory: (id) =>
+        set((state) => ({
+          searchHistory: state.searchHistory.filter((s) => s.id !== id),
+        })),
+      clearSearchHistory: () => set({ searchHistory: [] }),
+      findExistingSearch: (category, location) => {
+        const normalizedCategory = category.toLowerCase().trim()
+        const normalizedLocation = location.toLowerCase().trim()
+        return get().searchHistory.find(
+          (s) =>
+            s.category.toLowerCase().trim() === normalizedCategory &&
+            s.location.toLowerCase().trim() === normalizedLocation
+        )
+      },
     }),
     {
       name: 'leadflow-leads',
       partialize: (state) => ({
         pipelineLeads: state.pipelineLeads,
+        savedLeads: state.savedLeads,
         lastSearch: state.lastSearch,
+        searchHistory: state.searchHistory,
       }),
     }
   )

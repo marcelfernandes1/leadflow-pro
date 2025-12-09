@@ -3,69 +3,72 @@
 @tailwind utilities;
 
 /* ============================================
-   OBSIDIAN GLASS DESIGN SYSTEM
-   Premium Dark Luxury Theme
+   LEADFLOW OS — Design Language
+   "AI Precision Meets Agency Muscle"
+   Inspired by Linear + Stripe + Superhuman
    ============================================ */
 
 @layer base {
   :root {
-    /* Core Obsidian Palette */
-    --obsidian-void: 240 10% 4%;
-    --obsidian-deep: 240 10% 6%;
-    --obsidian-base: 240 10% 8%;
-    --obsidian-elevated: 240 10% 11%;
-    --obsidian-surface: 240 10% 14%;
-    --obsidian-border: 240 10% 18%;
-
-    /* Luminous Accents */
-    --violet-glow: 270 95% 65%;
-    --cyan-glow: 185 95% 55%;
-    --emerald-glow: 160 95% 45%;
-    --amber-glow: 38 95% 55%;
-    --rose-glow: 350 95% 60%;
+    /* Core Palette - Intelligent Neutrals (increased contrast) */
+    --bg-void: 220 14% 4%;          /* #0C0D0F - near black */
+    --bg-base: 220 12% 9%;          /* #141618 - surface panels */
+    --bg-elevated: 220 10% 14%;     /* #212428 - elevated cards */
+    --bg-surface: 220 9% 18%;       /* #292C31 - interactive surfaces */
+    --border-subtle: 220 8% 22%;    /* #343840 - borders */
+    --border-default: 220 7% 28%;   /* #42464F - stronger borders */
 
     /* Text Hierarchy */
-    --text-primary: 0 0% 98%;
-    --text-secondary: 240 5% 65%;
-    --text-tertiary: 240 5% 45%;
-    --text-muted: 240 5% 35%;
+    --text-primary: 0 0% 100%;      /* #FFFFFF */
+    --text-secondary: 220 8% 66%;   /* #A5A7AD */
+    --text-tertiary: 220 7% 46%;    /* #71747A */
+    --text-muted: 220 6% 32%;       /* #4D5057 */
 
-    /* Semantic Colors */
-    --background: var(--obsidian-void);
+    /* Brand Blue - Primary Action */
+    --brand: 217 90% 59%;           /* #3D7BF2 */
+    --brand-hover: 217 90% 65%;
+    --brand-muted: 217 90% 59%;
+
+    /* Heat Colors - Lead Scoring (MUST POP) */
+    --hot: 0 100% 66%;              /* #FF5353 - 🔥 Money right now */
+    --hot-light: 15 100% 72%;       /* #FF8F70 - gradient end */
+    --warm: 36 100% 65%;            /* #FFB74A - 🌡️ Potential */
+    --warm-light: 45 100% 71%;      /* #FFD36A - gradient end */
+    --cold: 197 100% 65%;           /* #4AC0FF - ❄️ Low priority */
+    --cold-dark: 217 90% 59%;       /* #3B82F6 - gradient end */
+    --neutral: 218 11% 65%;         /* #9CA3AF - Low priority */
+
+    /* Success & Status */
+    --success: 152 76% 46%;         /* #22C55E */
+    --warning: 36 100% 65%;         /* #FFB74A */
+    --destructive: 0 100% 66%;      /* #FF5353 */
+
+    /* Semantic Mappings */
+    --background: var(--bg-void);
     --foreground: var(--text-primary);
-    --card: var(--obsidian-elevated);
+    --card: var(--bg-elevated);
     --card-foreground: var(--text-primary);
-    --popover: var(--obsidian-base);
+    --popover: var(--bg-base);
     --popover-foreground: var(--text-primary);
-    --primary: var(--violet-glow);
+    --primary: var(--brand);
     --primary-foreground: 0 0% 100%;
-    --secondary: var(--obsidian-surface);
+    --secondary: var(--bg-surface);
     --secondary-foreground: var(--text-secondary);
-    --muted: var(--obsidian-surface);
+    --muted: var(--bg-surface);
     --muted-foreground: var(--text-tertiary);
-    --accent: var(--cyan-glow);
+    --accent: var(--brand);
     --accent-foreground: 0 0% 100%;
-    --destructive: var(--rose-glow);
-    --destructive-foreground: 0 0% 100%;
-    --success: var(--emerald-glow);
-    --success-foreground: 0 0% 100%;
-    --warning: var(--amber-glow);
-    --warning-foreground: 0 0% 100%;
-    --border: var(--obsidian-border);
-    --input: var(--obsidian-border);
-    --ring: var(--violet-glow);
-    --radius: 0.875rem;
+    --border: var(--border-subtle);
+    --input: var(--border-default);
+    --ring: var(--brand);
+    --radius: 0.5rem;
 
-    /* Glass Effect Variables */
-    --glass-bg: rgba(255, 255, 255, 0.03);
-    --glass-border: rgba(255, 255, 255, 0.08);
-    --glass-highlight: rgba(255, 255, 255, 0.05);
-
-    /* Glow Intensities */
-    --glow-sm: 0 0 15px -3px;
-    --glow-md: 0 0 30px -5px;
-    --glow-lg: 0 0 50px -8px;
-    --glow-xl: 0 0 80px -12px;
+    /* Shadows - 3D Depth System */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.4);
+    --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.5);
+    --shadow-glow: 0 0 30px -5px;
   }
 }
 
@@ -82,25 +85,32 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Geist', system-ui, -apple-system, sans-serif;
-    font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
-  /* Headings use Satoshi */
+  /* Precision Sans - uppercase labels get tracking */
+  .label-caps {
+    @apply uppercase tracking-wider text-xs font-medium;
+    letter-spacing: 0.08em;
+  }
+
+  /* Headings */
   h1, h2, h3, h4, h5, h6, .font-display {
-    font-family: 'Satoshi', system-ui, -apple-system, sans-serif;
-    letter-spacing: -0.025em;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.02em;
   }
 
-  /* Monospace for data */
+  /* Monospace for data/numbers */
   .font-mono, code, pre, .tabular-nums {
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
-    font-feature-settings: "liga" 1, "calt" 1;
+    font-family: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+    font-feature-settings: "liga" 0;
   }
 
-  /* Focus styles */
+  /* Focus styles - sharp and minimal */
   :focus-visible {
-    @apply outline-none ring-2 ring-primary/50 ring-offset-2 ring-offset-background;
+    @apply outline-none ring-2 ring-primary/60 ring-offset-1 ring-offset-background;
   }
 
   /* Selection */
@@ -110,114 +120,58 @@
 }
 
 /* ============================================
-   CUSTOM SCROLLBAR
+   SCROLLBAR - Trading Terminal Style
    ============================================ */
 
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: hsl(var(--obsidian-deep));
-  border-radius: 5px;
+  background: hsl(var(--bg-void));
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(
-    180deg,
-    hsl(var(--violet-glow) / 0.3) 0%,
-    hsl(var(--cyan-glow) / 0.3) 100%
-  );
-  border-radius: 5px;
-  border: 2px solid hsl(var(--obsidian-deep));
+  background: hsl(var(--border-default));
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(
-    180deg,
-    hsl(var(--violet-glow) / 0.5) 0%,
-    hsl(var(--cyan-glow) / 0.5) 100%
-  );
+  background: hsl(var(--text-tertiary));
 }
 
 ::-webkit-scrollbar-corner {
-  background: hsl(var(--obsidian-deep));
+  background: hsl(var(--bg-void));
 }
 
 /* ============================================
-   GLASS MORPHISM UTILITIES
+   HEAT GRADIENTS - Lead Scoring
    ============================================ */
 
 @layer components {
-  .glass {
-    background: var(--glass-bg);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid var(--glass-border);
-  }
-
-  .glass-subtle {
-    background: rgba(255, 255, 255, 0.02);
-    backdrop-filter: blur(12px) saturate(150%);
-    -webkit-backdrop-filter: blur(12px) saturate(150%);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-  }
-
-  .glass-prominent {
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(30px) saturate(200%);
-    -webkit-backdrop-filter: blur(30px) saturate(200%);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-  }
-}
-
-/* ============================================
-   GRADIENT UTILITIES
-   ============================================ */
-
-@layer components {
-  /* Mesh gradient background */
-  .gradient-mesh {
-    background:
-      radial-gradient(ellipse 80% 50% at 20% -10%, hsl(var(--violet-glow) / 0.15), transparent),
-      radial-gradient(ellipse 60% 40% at 80% 110%, hsl(var(--cyan-glow) / 0.12), transparent),
-      radial-gradient(ellipse 50% 50% at 50% 50%, hsl(var(--obsidian-void)), hsl(var(--obsidian-void)));
-  }
-
-  /* Accent gradients */
-  .gradient-violet {
-    background: linear-gradient(135deg, hsl(var(--violet-glow)) 0%, hsl(280 95% 50%) 100%);
-  }
-
-  .gradient-cyan {
-    background: linear-gradient(135deg, hsl(var(--cyan-glow)) 0%, hsl(200 95% 45%) 100%);
-  }
-
-  .gradient-aurora {
-    background: linear-gradient(135deg,
-      hsl(var(--violet-glow)) 0%,
-      hsl(var(--cyan-glow)) 50%,
-      hsl(var(--emerald-glow)) 100%
-    );
-  }
-
-  /* Lead score gradients */
   .gradient-hot {
-    background: linear-gradient(135deg, hsl(var(--rose-glow)) 0%, hsl(var(--amber-glow)) 100%);
+    background: linear-gradient(135deg, hsl(var(--hot-light)) 0%, hsl(var(--hot)) 100%);
   }
 
   .gradient-warm {
-    background: linear-gradient(135deg, hsl(var(--amber-glow)) 0%, hsl(45 95% 55%) 100%);
+    background: linear-gradient(135deg, hsl(var(--warm-light)) 0%, hsl(var(--warm)) 100%);
   }
 
   .gradient-cold {
-    background: linear-gradient(135deg, hsl(var(--cyan-glow)) 0%, hsl(220 95% 55%) 100%);
+    background: linear-gradient(135deg, hsl(var(--cold)) 0%, hsl(var(--cold-dark)) 100%);
   }
 
   /* Text gradients */
-  .text-gradient-primary {
-    background: linear-gradient(135deg, hsl(var(--violet-glow)) 0%, hsl(var(--cyan-glow)) 100%);
+  .text-gradient-brand {
+    background: linear-gradient(135deg, hsl(var(--brand)) 0%, #60A5FA 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-hot {
+    background: linear-gradient(135deg, hsl(var(--hot-light)) 0%, hsl(var(--hot)) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -225,164 +179,179 @@
 }
 
 /* ============================================
-   GLOW EFFECTS
+   CARD SYSTEM - Glass Morphism + Depth
    ============================================ */
 
 @layer components {
-  .glow-violet {
-    box-shadow: var(--glow-md) hsl(var(--violet-glow) / 0.4);
+  .card-base {
+    background: hsl(var(--bg-elevated) / 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid hsl(var(--border-subtle) / 0.5);
+    border-radius: 12px;
+    box-shadow: var(--shadow-md);
   }
 
-  .glow-cyan {
-    box-shadow: var(--glow-md) hsl(var(--cyan-glow) / 0.4);
+  .card-surface {
+    background: hsl(var(--bg-surface) / 0.5);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid hsl(var(--border-subtle) / 0.3);
+    border-radius: 12px;
   }
 
-  .glow-emerald {
-    box-shadow: var(--glow-md) hsl(var(--emerald-glow) / 0.4);
+  .card-glass {
+    background: hsl(var(--bg-elevated) / 0.6);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid hsl(var(--border-subtle) / 0.4);
+    border-radius: 12px;
+    box-shadow: var(--shadow-md), inset 0 1px 0 0 hsl(0 0% 100% / 0.05);
   }
 
-  .glow-amber {
-    box-shadow: var(--glow-md) hsl(var(--amber-glow) / 0.4);
+  .card-interactive {
+    background: hsl(var(--bg-elevated) / 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid hsl(var(--border-subtle) / 0.5);
+    border-radius: 12px;
+    box-shadow: var(--shadow-md);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  .glow-rose {
-    box-shadow: var(--glow-md) hsl(var(--rose-glow) / 0.4);
+  .card-interactive:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    border-color: hsl(var(--brand) / 0.3);
+    background: hsl(var(--bg-elevated) / 0.8);
   }
 
-  .glow-primary {
-    box-shadow: var(--glow-md) hsl(var(--primary) / 0.4);
-  }
-
-  /* Animated glow */
-  .glow-pulse {
-    animation: glow-pulse 2s ease-in-out infinite;
-  }
-
-  @keyframes glow-pulse {
-    0%, 100% {
-      box-shadow: var(--glow-md) hsl(var(--violet-glow) / 0.3);
-    }
-    50% {
-      box-shadow: var(--glow-lg) hsl(var(--violet-glow) / 0.5);
-    }
+  .card-interactive:active {
+    transform: translateY(0px);
   }
 }
 
 /* ============================================
-   NOISE TEXTURE
+   INTENT HEATMAP - Thermal Glow Behind Hot Leads
    ============================================ */
 
 @layer components {
-  .noise {
+  .intent-glow-hot {
     position: relative;
   }
 
-  .noise::before {
+  .intent-glow-hot::before {
     content: '';
     position: absolute;
-    inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-    opacity: 0.03;
-    pointer-events: none;
-    z-index: 1;
-  }
-}
-
-/* ============================================
-   ANIMATED BORDERS
-   ============================================ */
-
-@layer components {
-  .border-gradient {
-    position: relative;
-    background: hsl(var(--card));
-    border-radius: var(--radius);
-  }
-
-  .border-gradient::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    padding: 1px;
+    inset: -4px;
+    background: linear-gradient(180deg, hsl(var(--hot) / 0.15) 0%, transparent 100%);
     border-radius: inherit;
-    background: linear-gradient(
-      135deg,
-      hsl(var(--violet-glow) / 0.5) 0%,
-      hsl(var(--cyan-glow) / 0.5) 100%
-    );
-    -webkit-mask:
-      linear-gradient(#fff 0 0) content-box,
-      linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
     pointer-events: none;
+    z-index: -1;
   }
 
-  .border-gradient-animated::before {
-    animation: border-rotate 3s linear infinite;
-    background: conic-gradient(
-      from 0deg,
-      hsl(var(--violet-glow)),
-      hsl(var(--cyan-glow)),
-      hsl(var(--emerald-glow)),
-      hsl(var(--violet-glow))
-    );
+  .intent-glow-warm::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    background: linear-gradient(180deg, hsl(var(--warm) / 0.12) 0%, transparent 100%);
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: -1;
+  }
+}
+
+/* ============================================
+   SCORE ORBIT RING - Pulsing Score Indicator
+   ============================================ */
+
+@layer components {
+  .score-orbit {
+    position: relative;
   }
 
-  @keyframes border-rotate {
+  .score-orbit::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    border-top-color: currentColor;
+    animation: orbit-spin 2s linear infinite;
+    opacity: 0.4;
+  }
+
+  @keyframes orbit-spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
   }
+
+  .score-orbit-hot::after {
+    border-top-color: hsl(var(--hot));
+  }
+
+  .score-orbit-warm::after {
+    border-top-color: hsl(var(--warm));
+  }
 }
 
 /* ============================================
-   SHIMMER LOADING
+   AI INSIGHT LINES - Neural Connection Effect
    ============================================ */
 
 @layer components {
-  .shimmer {
+  .ai-line {
     position: relative;
     overflow: hidden;
-    background: linear-gradient(
-      90deg,
-      hsl(var(--obsidian-surface)) 0%,
-      hsl(var(--obsidian-elevated)) 50%,
-      hsl(var(--obsidian-surface)) 100%
-    );
-    background-size: 200% 100%;
-    animation: shimmer 1.5s ease-in-out infinite;
   }
 
-  @keyframes shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
+  .ai-line::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, hsl(var(--brand)) 50%, transparent 100%);
+    animation: ai-scan 2s ease-in-out infinite;
+  }
+
+  @keyframes ai-scan {
+    0%, 100% { opacity: 0; transform: translateX(-100%); }
+    50% { opacity: 1; transform: translateX(100%); }
   }
 }
 
 /* ============================================
-   CARD HOVER EFFECTS
+   SMART HIGHLIGHTING - Stripe Radar Style
    ============================================ */
 
 @layer components {
-  .card-hover {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  .smart-highlight {
+    position: relative;
   }
 
-  .card-hover:hover {
-    transform: translateY(-2px);
-    box-shadow:
-      0 20px 40px -15px hsl(var(--obsidian-void) / 0.8),
-      0 0 20px -5px hsl(var(--violet-glow) / 0.15);
-    border-color: hsl(var(--violet-glow) / 0.3);
+  .smart-highlight::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    background: hsl(var(--brand) / 0.15);
+    border-radius: inherit;
+    opacity: 0;
+    animation: highlight-flicker 0.6s ease-out forwards;
   }
 
-  .card-hover-lift:hover {
-    transform: translateY(-4px) scale(1.01);
+  @keyframes highlight-flicker {
+    0% { opacity: 0; }
+    20% { opacity: 0.8; }
+    40% { opacity: 0.2; }
+    60% { opacity: 0.6; }
+    100% { opacity: 0.15; }
   }
 }
 
 /* ============================================
-   BUTTON EFFECTS
+   BUTTON SYSTEM - Sharp, High Contrast
    ============================================ */
 
 @layer components {
@@ -394,85 +363,191 @@
   .btn-glow::before {
     content: '';
     position: absolute;
-    inset: -2px;
-    background: linear-gradient(
-      135deg,
-      hsl(var(--violet-glow)) 0%,
-      hsl(var(--cyan-glow)) 100%
-    );
-    border-radius: inherit;
+    inset: 0;
+    background: linear-gradient(135deg, hsl(var(--brand)) 0%, #60A5FA 100%);
     opacity: 0;
-    transition: opacity 0.3s ease;
+    transition: opacity 0.2s ease;
+    filter: blur(12px);
     z-index: -1;
-    filter: blur(15px);
   }
 
   .btn-glow:hover::before {
-    opacity: 0.6;
+    opacity: 0.4;
   }
 }
 
 /* ============================================
-   STAGE INDICATORS
+   BADGE SYSTEM - Microchip Style
+   ============================================ */
+
+@layer components {
+  .badge-chip {
+    @apply inline-flex items-center px-2 py-0.5 text-xs font-medium rounded;
+    border: 1px solid currentColor;
+    background: transparent;
+  }
+
+  .badge-hot {
+    color: hsl(var(--hot));
+    background: hsl(var(--hot) / 0.1);
+    border-color: hsl(var(--hot) / 0.3);
+  }
+
+  .badge-warm {
+    color: hsl(var(--warm));
+    background: hsl(var(--warm) / 0.1);
+    border-color: hsl(var(--warm) / 0.3);
+  }
+
+  .badge-cold {
+    color: hsl(var(--cold));
+    background: hsl(var(--cold) / 0.1);
+    border-color: hsl(var(--cold) / 0.3);
+  }
+}
+
+/* ============================================
+   SHIMMER LOADING
+   ============================================ */
+
+@layer components {
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+    background: hsl(var(--bg-surface));
+  }
+
+  .shimmer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      hsl(var(--border-default) / 0.3) 50%,
+      transparent 100%
+    );
+    animation: shimmer 1.5s ease-in-out infinite;
+    transform: translateX(-100%);
+  }
+
+  @keyframes shimmer {
+    100% { transform: translateX(100%); }
+  }
+}
+
+/* ============================================
+   PIPELINE STAGE INDICATORS
    ============================================ */
 
 @layer components {
   .stage-new {
-    --stage-color: hsl(var(--cyan-glow));
-    background: hsl(var(--cyan-glow) / 0.15);
-    border-color: hsl(var(--cyan-glow) / 0.3);
+    --stage-color: hsl(var(--cold));
+    color: hsl(var(--cold));
   }
 
   .stage-contacted {
-    --stage-color: hsl(var(--amber-glow));
-    background: hsl(var(--amber-glow) / 0.15);
-    border-color: hsl(var(--amber-glow) / 0.3);
+    --stage-color: hsl(var(--warm));
+    color: hsl(var(--warm));
   }
 
   .stage-qualified {
-    --stage-color: hsl(var(--violet-glow));
-    background: hsl(var(--violet-glow) / 0.15);
-    border-color: hsl(var(--violet-glow) / 0.3);
+    --stage-color: hsl(var(--brand));
+    color: hsl(var(--brand));
   }
 
   .stage-proposal {
-    --stage-color: hsl(350 95% 65%);
-    background: hsl(350 95% 65% / 0.15);
-    border-color: hsl(350 95% 65% / 0.3);
+    --stage-color: #A855F7;
+    color: #A855F7;
   }
 
   .stage-negotiation {
-    --stage-color: hsl(25 95% 55%);
-    background: hsl(25 95% 55% / 0.15);
-    border-color: hsl(25 95% 55% / 0.3);
+    --stage-color: #F97316;
+    color: #F97316;
   }
 
   .stage-won {
-    --stage-color: hsl(var(--emerald-glow));
-    background: hsl(var(--emerald-glow) / 0.15);
-    border-color: hsl(var(--emerald-glow) / 0.3);
+    --stage-color: hsl(var(--success));
+    color: hsl(var(--success));
   }
 
   .stage-lost {
     --stage-color: hsl(var(--text-tertiary));
-    background: hsl(var(--text-tertiary) / 0.15);
-    border-color: hsl(var(--text-tertiary) / 0.3);
+    color: hsl(var(--text-tertiary));
   }
 }
 
 /* ============================================
-   ANIMATED ELEMENTS
+   DATA VISUALIZATION - Neon Intelligence
+   ============================================ */
+
+@layer components {
+  .chart-glow {
+    filter: drop-shadow(0 0 8px hsl(var(--brand) / 0.4));
+  }
+
+  .chart-line {
+    stroke: hsl(var(--brand));
+    stroke-width: 2;
+    fill: none;
+  }
+
+  .chart-area {
+    fill: url(#chart-gradient);
+  }
+
+  .chart-tooltip {
+    background: hsl(var(--bg-elevated));
+    border: 1px solid hsl(var(--border-default));
+    border-radius: 8px;
+    box-shadow: var(--shadow-lg);
+    padding: 12px 16px;
+  }
+}
+
+/* ============================================
+   MOTION TRAIL - Drag Ghost Effect
+   ============================================ */
+
+@layer components {
+  .motion-trail {
+    position: relative;
+  }
+
+  .motion-trail::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: inherit;
+    border-radius: inherit;
+    opacity: 0.3;
+    transform: translate(-4px, -4px);
+    filter: blur(4px);
+    z-index: -1;
+    transition: all 0.15s ease;
+  }
+
+  .motion-trail:active::after,
+  .motion-trail.dragging::after {
+    opacity: 0.2;
+    transform: translate(-8px, -8px);
+    filter: blur(8px);
+  }
+}
+
+/* ============================================
+   ANIMATIONS
    ============================================ */
 
 @layer utilities {
   .animate-in {
-    animation: animate-in 0.3s ease-out;
+    animation: animate-in 0.2s ease-out;
   }
 
   @keyframes animate-in {
     from {
       opacity: 0;
-      transform: translateY(10px);
+      transform: translateY(8px);
     }
     to {
       opacity: 1;
@@ -480,23 +555,14 @@
     }
   }
 
-  .animate-fade-in {
-    animation: fade-in 0.5s ease-out;
-  }
-
-  @keyframes fade-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-
   .animate-scale-in {
-    animation: scale-in 0.2s ease-out;
+    animation: scale-in 0.15s ease-out;
   }
 
   @keyframes scale-in {
     from {
       opacity: 0;
-      transform: scale(0.95);
+      transform: scale(0.96);
     }
     to {
       opacity: 1;
@@ -504,49 +570,32 @@
     }
   }
 
-  .animate-slide-up {
-    animation: slide-up 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  .animate-count-up {
+    animation: count-up 0.7s ease-out;
   }
 
-  @keyframes slide-up {
-    from {
-      opacity: 0;
-      transform: translateY(20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+  @keyframes count-up {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 
-  /* Floating animation */
-  .animate-float {
-    animation: float 3s ease-in-out infinite;
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
   }
 
-  @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-10px); }
-  }
-
-  /* Subtle pulse */
-  .animate-pulse-subtle {
-    animation: pulse-subtle 2s ease-in-out infinite;
-  }
-
-  @keyframes pulse-subtle {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 0 0 hsl(var(--brand) / 0.4); }
+    50% { box-shadow: 0 0 20px 4px hsl(var(--brand) / 0.2); }
   }
 }
 
 /* ============================================
-   RESPONSIVE ADJUSTMENTS
+   RESPONSIVE
    ============================================ */
 
 @media (max-width: 768px) {
   :root {
-    --radius: 0.75rem;
+    --radius: 0.375rem;
   }
 }
 
@@ -559,23 +608,5 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-}
-
-/* ============================================
-   PRINT STYLES
-   ============================================ */
-
-@media print {
-  body {
-    background: white;
-    color: black;
-  }
-
-  .glass, .glass-subtle, .glass-prominent {
-    backdrop-filter: none;
-    background: white;
-    border: 1px solid #ddd;
   }
 }

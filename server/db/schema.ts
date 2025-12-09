@@ -13,8 +13,9 @@ import {
 // Users table
 export const users = mysqlTable('users', {
   id: int('id').primaryKey().autoincrement(),
-  email: varchar('email', { length: 320 }).unique(),
-  name: text('name'),
+  email: varchar('email', { length: 320 }).unique().notNull(),
+  passwordHash: varchar('password_hash', { length: 255 }).notNull(),
+  name: varchar('name', { length: 255 }).notNull(),
   role: mysqlEnum('role', ['user', 'admin']).default('user'),
   subscriptionTier: mysqlEnum('subscription_tier', [
     'free',
@@ -50,6 +51,16 @@ export const leads = mysqlTable(
     facebook: varchar('facebook', { length: 255 }),
     linkedin: varchar('linkedin', { length: 255 }),
     twitter: varchar('twitter', { length: 255 }),
+    tiktok: varchar('tiktok', { length: 255 }),
+    youtube: varchar('youtube', { length: 255 }),
+
+    // Email Verification
+    emailVerified: int('email_verified'), // 0 or 1 (boolean)
+    emailVerificationScore: int('email_verification_score'), // 0-100
+    emailVerificationStatus: varchar('email_verification_status', { length: 20 }), // valid, invalid, catchall, unknown
+
+    // Social Metrics (stored as JSON)
+    socialMetrics: json('social_metrics'), // All platform metrics
 
     // Google Data
     googleRating: decimal('google_rating', { precision: 2, scale: 1 }),
@@ -187,6 +198,24 @@ export const scrapingJobs = mysqlTable(
   })
 )
 
+// Job Postings Cache table
+export const jobPostingsCache = mysqlTable(
+  'job_postings_cache',
+  {
+    id: int('id').primaryKey().autoincrement(),
+    companyName: varchar('company_name', { length: 255 }).notNull(),
+    jobPostings: json('job_postings').notNull(), // Array of JobPosting
+    scrapedAt: timestamp('scraped_at').defaultNow().notNull(),
+    expiresAt: timestamp('expires_at').notNull(), // 60 days from scraped_at
+    source: varchar('source', { length: 50 }).default('indeed+upwork'), // which sources were scraped
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (table) => ({
+    companyIdx: index('idx_company').on(table.companyName),
+    expiresIdx: index('idx_expires').on(table.expiresAt),
+  })
+)
+
 // Type exports
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
@@ -195,3 +224,5 @@ export type NewLead = typeof leads.$inferInsert
 export type SearchCache = typeof searchCache.$inferSelect
 export type LeadActivity = typeof leadActivities.$inferSelect
 export type ScrapingJob = typeof scrapingJobs.$inferSelect
+export type JobPostingsCache = typeof jobPostingsCache.$inferSelect
+export type NewJobPostingsCache = typeof jobPostingsCache.$inferInsert

@@ -11,5 +11,6 @@ export default defineConfig({
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'leadflow_pro',
+    ssl: process.env.DB_SSL === 'true' ? {} : undefined,
   },
 })

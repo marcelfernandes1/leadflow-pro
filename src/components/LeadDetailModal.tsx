@@ -7,6 +7,8 @@ import {
   Globe,
   Instagram,
   Linkedin,
+  Twitter,
+  Youtube,
   MapPin,
   Star,
   X,
@@ -21,7 +23,22 @@ import {
   FileText,
   Pencil,
   Trash2,
+  Facebook,
+  BadgeCheck,
+  AlertCircle,
 } from 'lucide-react'
+
+// TikTok icon component (not in lucide-react)
+const TikTokIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
+  </svg>
+)
 import {
   Dialog,
   DialogContent,
@@ -275,6 +292,15 @@ export function LeadDetailModal({
                       <span>{lead.instagram}</span>
                     </button>
                   )}
+                  {lead.facebook && (
+                    <button
+                      onClick={() => onContact('facebook')}
+                      className="flex items-center gap-2 text-sm hover:text-primary transition-colors"
+                    >
+                      <Facebook className="h-4 w-4 text-muted-foreground" />
+                      <span>{lead.facebook}</span>
+                    </button>
+                  )}
                   {lead.linkedin && (
                     <button
                       onClick={() => onContact('linkedin')}
@@ -284,7 +310,56 @@ export function LeadDetailModal({
                       <span>{lead.linkedin}</span>
                     </button>
                   )}
+                  {lead.twitter && (
+                    <button
+                      onClick={() => onContact('twitter')}
+                      className="flex items-center gap-2 text-sm hover:text-primary transition-colors"
+                    >
+                      <Twitter className="h-4 w-4 text-muted-foreground" />
+                      <span>{lead.twitter}</span>
+                    </button>
+                  )}
+                  {lead.tiktok && (
+                    <button
+                      onClick={() => window.open(`https://tiktok.com/@${lead.tiktok?.replace('@', '') ?? ''}`, '_blank')}
+                      className="flex items-center gap-2 text-sm hover:text-primary transition-colors"
+                    >
+                      <TikTokIcon className="h-4 w-4 text-muted-foreground" />
+                      <span>{lead.tiktok}</span>
+                    </button>
+                  )}
+                  {lead.youtube && (
+                    <button
+                      onClick={() => window.open(lead.youtube?.startsWith('http') ? lead.youtube : `https://youtube.com/@${lead.youtube}`, '_blank')}
+                      className="flex items-center gap-2 text-sm hover:text-primary transition-colors"
+                    >
+                      <Youtube className="h-4 w-4 text-muted-foreground" />
+                      <span>{lead.youtube}</span>
+                    </button>
+                  )}
                 </div>
+
+                {/* Email Verification Status */}
+                {lead.email && lead.emailVerificationStatus && (
+                  <div className="flex items-center gap-2 mt-2 text-xs">
+                    {lead.emailVerificationStatus === 'valid' ? (
+                      <div className="flex items-center gap-1 text-green-600">
+                        <BadgeCheck className="h-3 w-3" />
+                        <span>Verified email</span>
+                      </div>
+                    ) : lead.emailVerificationStatus === 'invalid' ? (
+                      <div className="flex items-center gap-1 text-red-500">
+                        <AlertCircle className="h-3 w-3" />
+                        <span>Invalid email</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 text-amber-500">
+                        <AlertCircle className="h-3 w-3" />
+                        <span>Unverified</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <Separator />

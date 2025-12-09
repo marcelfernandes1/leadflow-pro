@@ -9,6 +9,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Semantic colors from CSS variables
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
@@ -28,11 +29,9 @@ const config: Config = {
         },
         success: {
           DEFAULT: 'hsl(var(--success))',
-          foreground: 'hsl(var(--success-foreground))',
         },
         warning: {
           DEFAULT: 'hsl(var(--warning))',
-          foreground: 'hsl(var(--warning-foreground))',
         },
         muted: {
           DEFAULT: 'hsl(var(--muted))',
@@ -50,61 +49,44 @@ const config: Config = {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
-        // Obsidian palette
-        obsidian: {
-          void: 'hsl(var(--obsidian-void))',
-          deep: 'hsl(var(--obsidian-deep))',
-          base: 'hsl(var(--obsidian-base))',
-          elevated: 'hsl(var(--obsidian-elevated))',
-          surface: 'hsl(var(--obsidian-surface))',
-          border: 'hsl(var(--obsidian-border))',
+
+        // LeadFlow OS - Intelligent Neutrals
+        void: 'hsl(var(--bg-void))',
+        surface: 'hsl(var(--bg-surface))',
+        elevated: 'hsl(var(--bg-elevated))',
+
+        // Brand
+        brand: {
+          DEFAULT: 'hsl(var(--brand))',
+          hover: 'hsl(var(--brand-hover))',
         },
-        // Luminous accents
-        violet: {
-          DEFAULT: 'hsl(var(--violet-glow))',
-          glow: 'hsl(var(--violet-glow))',
-        },
-        cyan: {
-          DEFAULT: 'hsl(var(--cyan-glow))',
-          glow: 'hsl(var(--cyan-glow))',
-        },
-        emerald: {
-          DEFAULT: 'hsl(var(--emerald-glow))',
-          glow: 'hsl(var(--emerald-glow))',
-        },
-        amber: {
-          DEFAULT: 'hsl(var(--amber-glow))',
-          glow: 'hsl(var(--amber-glow))',
-        },
-        rose: {
-          DEFAULT: 'hsl(var(--rose-glow))',
-          glow: 'hsl(var(--rose-glow))',
-        },
-        // Lead score colors
+
+        // Heat Colors - Lead Scoring (MUST POP)
         hot: {
-          DEFAULT: 'hsl(var(--rose-glow))',
-          light: 'hsl(var(--rose-glow) / 0.15)',
+          DEFAULT: 'hsl(var(--hot))',
+          light: 'hsl(var(--hot-light))',
         },
         warm: {
-          DEFAULT: 'hsl(var(--amber-glow))',
-          light: 'hsl(var(--amber-glow) / 0.15)',
+          DEFAULT: 'hsl(var(--warm))',
+          light: 'hsl(var(--warm-light))',
         },
         cold: {
-          DEFAULT: 'hsl(var(--cyan-glow))',
-          light: 'hsl(var(--cyan-glow) / 0.15)',
+          DEFAULT: 'hsl(var(--cold))',
+          dark: 'hsl(var(--cold-dark))',
         },
+        neutral: 'hsl(var(--neutral))',
       },
       borderRadius: {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
-        xl: 'calc(var(--radius) + 4px)',
-        '2xl': 'calc(var(--radius) + 8px)',
+        xl: '12px',
+        '2xl': '16px',
       },
       fontFamily: {
-        sans: ['Geist', 'system-ui', '-apple-system', 'sans-serif'],
-        display: ['Satoshi', 'system-ui', '-apple-system', 'sans-serif'],
-        mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        display: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['JetBrains Mono', 'SF Mono', 'ui-monospace', 'monospace'],
       },
       fontSize: {
         '2xs': ['0.625rem', { lineHeight: '0.875rem' }],
@@ -116,17 +98,14 @@ const config: Config = {
         '128': '32rem',
       },
       boxShadow: {
-        'glow-sm': '0 0 15px -3px',
-        'glow-md': '0 0 30px -5px',
-        'glow-lg': '0 0 50px -8px',
-        'glow-xl': '0 0 80px -12px',
-        'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.3)',
-        'elevated': '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-      },
-      backgroundImage: {
-        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'gradient-conic': 'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
-        'mesh': 'radial-gradient(ellipse 80% 50% at 20% -10%, hsl(var(--violet-glow) / 0.15), transparent), radial-gradient(ellipse 60% 40% at 80% 110%, hsl(var(--cyan-glow) / 0.12), transparent)',
+        'sm': 'var(--shadow-sm)',
+        'md': 'var(--shadow-md)',
+        'lg': 'var(--shadow-lg)',
+        'xl': 'var(--shadow-xl)',
+        'glow': 'var(--shadow-glow)',
+        'glow-brand': '0 0 30px -5px hsl(var(--brand) / 0.4)',
+        'glow-hot': '0 0 30px -5px hsl(var(--hot) / 0.4)',
+        'glow-warm': '0 0 30px -5px hsl(var(--warm) / 0.4)',
       },
       keyframes: {
         'accordion-down': {
@@ -138,76 +117,46 @@ const config: Config = {
           to: { height: '0' },
         },
         shimmer: {
-          '0%': { backgroundPosition: '200% 0' },
-          '100%': { backgroundPosition: '-200% 0' },
-        },
-        pulse: {
-          '0%, 100%': { opacity: '1' },
-          '50%': { opacity: '0.5' },
+          '100%': { transform: 'translateX(100%)' },
         },
         'pulse-glow': {
-          '0%, 100%': { boxShadow: '0 0 20px -5px hsl(var(--violet-glow) / 0.3)' },
-          '50%': { boxShadow: '0 0 40px -5px hsl(var(--violet-glow) / 0.5)' },
-        },
-        float: {
-          '0%, 100%': { transform: 'translateY(0)' },
-          '50%': { transform: 'translateY(-10px)' },
+          '0%, 100%': { boxShadow: '0 0 0 0 hsl(var(--brand) / 0.4)' },
+          '50%': { boxShadow: '0 0 20px 4px hsl(var(--brand) / 0.2)' },
         },
         'slide-up': {
-          from: { opacity: '0', transform: 'translateY(20px)' },
+          from: { opacity: '0', transform: 'translateY(8px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
-        },
-        'slide-down': {
-          from: { opacity: '0', transform: 'translateY(-20px)' },
-          to: { opacity: '1', transform: 'translateY(0)' },
-        },
-        'slide-left': {
-          from: { opacity: '0', transform: 'translateX(20px)' },
-          to: { opacity: '1', transform: 'translateX(0)' },
-        },
-        'slide-right': {
-          from: { opacity: '0', transform: 'translateX(-20px)' },
-          to: { opacity: '1', transform: 'translateX(0)' },
         },
         'scale-in': {
-          from: { opacity: '0', transform: 'scale(0.95)' },
+          from: { opacity: '0', transform: 'scale(0.96)' },
           to: { opacity: '1', transform: 'scale(1)' },
         },
         'fade-in': {
           from: { opacity: '0' },
           to: { opacity: '1' },
         },
-        'spin-slow': {
+        'count-up': {
+          from: { opacity: '0', transform: 'translateY(10px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        'orbit-spin': {
           from: { transform: 'rotate(0deg)' },
           to: { transform: 'rotate(360deg)' },
-        },
-        'border-beam': {
-          '0%': { transform: 'translateX(-100%)' },
-          '100%': { transform: 'translateX(100%)' },
         },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
         shimmer: 'shimmer 1.5s ease-in-out infinite',
-        pulse: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'pulse-glow': 'pulse-glow 2s ease-in-out infinite',
-        float: 'float 3s ease-in-out infinite',
-        'slide-up': 'slide-up 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-        'slide-down': 'slide-down 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-        'slide-left': 'slide-left 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-        'slide-right': 'slide-right 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-        'scale-in': 'scale-in 0.2s ease-out',
-        'fade-in': 'fade-in 0.5s ease-out',
-        'spin-slow': 'spin-slow 8s linear infinite',
-        'border-beam': 'border-beam 3s linear infinite',
+        'slide-up': 'slide-up 0.2s ease-out',
+        'scale-in': 'scale-in 0.15s ease-out',
+        'fade-in': 'fade-in 0.3s ease-out',
+        'count-up': 'count-up 0.7s ease-out',
+        'orbit-spin': 'orbit-spin 2s linear infinite',
       },
       transitionTimingFunction: {
         'smooth': 'cubic-bezier(0.4, 0, 0.2, 1)',
-        'bounce-in': 'cubic-bezier(0.68, -0.55, 0.265, 1.55)',
-      },
-      backdropBlur: {
-        xs: '2px',
       },
     },
   },
