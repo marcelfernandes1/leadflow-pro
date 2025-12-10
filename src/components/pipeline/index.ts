@@ -1,0 +1,8 @@
+export { DealCard, DealCardOverlay } from './DealCard'
+export { DealDetailPanel } from './DealDetailPanel'
+export { KanbanColumn } from './KanbanColumn'
+export { PipelineSettings } from './PipelineSettings'
+export { PipelineAnalytics } from './PipelineAnalytics'
+export { QuickAddDeal } from './QuickAddDeal'
+export { TableView } from './TableView'
+export { TodayView } from './TodayView'
