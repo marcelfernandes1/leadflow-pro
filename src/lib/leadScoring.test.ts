@@ -30,8 +30,6 @@ const createMockLead = (overrides: Partial<Lead> = {}): Lead => ({
 const createMockEnrichmentData = (overrides: Partial<EnrichmentData> = {}): EnrichmentData => ({
   technologies: [],
   domainAge: 5,
-  employeeCount: 25,
-  jobPostings: [],
   performanceScore: 75,
   isMobileFriendly: true,
   ...overrides,
@@ -69,15 +67,7 @@ describe('Lead Scoring Algorithm', () => {
 
     it('should cap growthSignals at 30 points', () => {
       const lead = createMockLead()
-      const enrichment = createMockEnrichmentData({
-        jobPostings: [
-          { title: 'Developer', date: '2024-01-01', source: 'LinkedIn' },
-          { title: 'Designer', date: '2024-01-02', source: 'Indeed' },
-        ],
-        employeeCount: 25,
-        hasRecentFunding: true,
-        fundingAmount: 5000000,
-      })
+      const enrichment = createMockEnrichmentData({})
       const result = calculateLeadScore(lead, enrichment)
 
       expect(result.breakdown.growthSignals).toBeLessThanOrEqual(30)
@@ -181,58 +171,13 @@ describe('Lead Scoring Algorithm', () => {
     })
 
     describe('Growth Signals Analysis', () => {
-      it('should increase score for job postings', () => {
+      it('should return zero growth signals for local businesses', () => {
         const lead = createMockLead()
-        const withJobs = createMockEnrichmentData({
-          jobPostings: [{ title: 'Developer', date: '2024-01-01', source: 'LinkedIn' }],
-        })
-        const withoutJobs = createMockEnrichmentData({ jobPostings: [] })
-
-        const scoreWithJobs = calculateLeadScore(lead, withJobs)
-        const scoreWithoutJobs = calculateLeadScore(lead, withoutJobs)
-
-        expect(scoreWithJobs.breakdown.growthSignals).toBeGreaterThan(
-          scoreWithoutJobs.breakdown.growthSignals
-        )
-      })
-
-      it('should add growth signals for job postings', () => {
-        const lead = createMockLead()
-        const enrichment = createMockEnrichmentData({
-          jobPostings: [{ title: 'Sales Manager', date: '2024-03-01', source: 'Indeed' }],
-        })
+        const enrichment = createMockEnrichmentData({})
         const result = calculateLeadScore(lead, enrichment)
 
-        expect(result.growthSignals.some((s) => s.type === 'job_posting')).toBe(true)
-      })
-
-      it('should increase score for sweet spot employee count (10-50)', () => {
-        const lead = createMockLead()
-        const sweetSpot = createMockEnrichmentData({ employeeCount: 25 })
-        const tooSmall = createMockEnrichmentData({ employeeCount: 3 })
-
-        const scoreSweetSpot = calculateLeadScore(lead, sweetSpot)
-        const scoreTooSmall = calculateLeadScore(lead, tooSmall)
-
-        expect(scoreSweetSpot.breakdown.growthSignals).toBeGreaterThan(
-          scoreTooSmall.breakdown.growthSignals
-        )
-      })
-
-      it('should increase score for recent funding', () => {
-        const lead = createMockLead()
-        const withFunding = createMockEnrichmentData({
-          hasRecentFunding: true,
-          fundingAmount: 2000000,
-        })
-        const withoutFunding = createMockEnrichmentData({ hasRecentFunding: false })
-
-        const scoreWithFunding = calculateLeadScore(lead, withFunding)
-        const scoreWithoutFunding = calculateLeadScore(lead, withoutFunding)
-
-        expect(scoreWithFunding.breakdown.growthSignals).toBeGreaterThan(
-          scoreWithoutFunding.breakdown.growthSignals
-        )
+        // Growth signals simplified for local businesses
+        expect(result.breakdown.growthSignals).toBe(0)
       })
     })
 
@@ -348,7 +293,6 @@ describe('Lead Scoring Algorithm', () => {
         const lead = createMockLead()
         const enrichment = createMockEnrichmentData({
           technologies: [],
-          jobPostings: [{ title: 'Dev', date: '2024-01-01', source: 'LinkedIn' }],
         })
         const result = calculateLeadScore(lead, enrichment)
 
@@ -429,10 +373,7 @@ describe('Lead Scoring Algorithm', () => {
           { name: 'Mailchimp', category: 'Email Marketing' },
         ],
         domainInfo: { age: 5 },
-        employeeCount: 50,
-        jobPostings: [{ title: 'Developer', date: '2024-01-01', source: 'LinkedIn' }],
         websiteAnalysis: { performanceScore: 85, isMobileFriendly: true },
-        fundingInfo: { hasRecentFunding: true, amount: 1000000 },
         socialMetrics: {
           instagram: { followers: 5000, following: 500, mediaCount: 100, isBusiness: true },
           facebook: { likes: 3000, followers: 3500 },
@@ -443,12 +384,8 @@ describe('Lead Scoring Algorithm', () => {
 
       expect(result.technologies).toEqual(['Salesforce', 'Mailchimp'])
       expect(result.domainAge).toBe(5)
-      expect(result.employeeCount).toBe(50)
-      expect(result.jobPostings).toHaveLength(1)
       expect(result.performanceScore).toBe(85)
       expect(result.isMobileFriendly).toBe(true)
-      expect(result.hasRecentFunding).toBe(true)
-      expect(result.fundingAmount).toBe(1000000)
       expect(result.socialFollowers?.instagram).toBe(5000)
       expect(result.socialFollowers?.facebook).toBe(3500)
     })
@@ -462,10 +399,7 @@ describe('Lead Scoring Algorithm', () => {
 
       expect(result.technologies).toEqual([])
       expect(result.domainAge).toBeUndefined()
-      expect(result.employeeCount).toBeUndefined()
-      expect(result.jobPostings).toEqual([])
       expect(result.performanceScore).toBeUndefined()
-      expect(result.hasRecentFunding).toBe(false)
     })
 
     it('should handle null values', () => {
@@ -473,9 +407,7 @@ describe('Lead Scoring Algorithm', () => {
         technologies: undefined,
         domainInfo: null,
         websiteAnalysis: null,
-        fundingInfo: null,
         socialMetrics: null,
-        employeeCount: null,
       }
 
       const result = convertEnrichmentResult(backendResult)
@@ -483,7 +415,6 @@ describe('Lead Scoring Algorithm', () => {
       expect(result.technologies).toEqual([])
       expect(result.domainAge).toBeUndefined()
       expect(result.performanceScore).toBeUndefined()
-      expect(result.hasRecentFunding).toBe(false)
       expect(result.socialFollowers).toBeUndefined()
     })
   })

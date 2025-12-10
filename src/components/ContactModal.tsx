@@ -56,7 +56,9 @@ const contactMethods: Array<{
     color: 'bg-pink-500 hover:bg-pink-600',
     getUrl: (lead) =>
       lead.instagram
-        ? `https://instagram.com/${lead.instagram.replace('@', '')}`
+        ? lead.instagram.startsWith('http')
+          ? lead.instagram
+          : `https://instagram.com/${lead.instagram.replace('@', '')}`
         : null,
   },
   {
@@ -90,7 +92,9 @@ const contactMethods: Array<{
     color: 'bg-gray-800 hover:bg-gray-900',
     getUrl: (lead) =>
       lead.twitter
-        ? `https://twitter.com/${lead.twitter.replace('@', '')}`
+        ? lead.twitter.startsWith('http')
+          ? lead.twitter
+          : `https://twitter.com/${lead.twitter.replace('@', '')}`
         : null,
   },
   {

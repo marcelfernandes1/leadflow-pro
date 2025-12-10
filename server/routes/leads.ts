@@ -5,6 +5,11 @@ import { checkCache, saveToCache, getCacheStats } from '../services/cache.js'
 import { enrichLead, bulkEnrichLeads } from '../services/enrichment.js'
 import { calculateLeadScore, getLeadCategory, calculateOpportunityValue } from '../services/scoring.js'
 import { searchHighIntentBusinesses, getServiceTypes, getUSStates } from '../services/highIntentSearch.js'
+import {
+  getEnrichmentFromCache,
+  saveEnrichmentToCache,
+  getEnrichmentCacheStats,
+} from '../services/enrichmentCache.js'
 
 // Simple XSS sanitization - remove script tags and dangerous attributes
 function sanitizeText(text: string): string {
@@ -102,6 +107,18 @@ export const leadsRouter = router({
   // Get cache statistics
   getCacheStats: publicProcedure.query(async () => {
     return await getCacheStats()
+  }),
+
+  // Get enrichment cache statistics (shows how much we're saving on analysis)
+  getEnrichmentCacheStats: publicProcedure.query(async () => {
+    return await getEnrichmentCacheStats()
+  }),
+
+  // Clear cache (for development/testing)
+  clearCache: publicProcedure.mutation(async () => {
+    const { clearCache } = await import('../services/cache.js')
+    await clearCache()
+    return { success: true, message: 'Cache cleared' }
   }),
 
   // Get a single lead by ID (requires authentication)
@@ -561,8 +578,6 @@ export const leadsRouter = router({
           pitchRecommendation: scoring.pitchRecommendation,
           websiteAnalysis: enrichment.websiteAnalysis,
           domainInfo: enrichment.domainInfo,
-          employeeCount: enrichment.employeeCount,
-          fundingInfo: enrichment.fundingInfo,
           enrichedAt: enrichment.enrichedAt,
         }
       } catch (error) {
@@ -577,6 +592,7 @@ export const leadsRouter = router({
   // Enrich a discovered lead (before adding to pipeline) - available to all users
   // Note: Email discovery is free. Tech stack + scoring is Pro only (handled in frontend)
   // Google Maps ratings/reviews are the primary data source - no separate Yelp/Facebook scraping
+  // Uses shared cache to avoid re-analyzing the same website for different users
   enrichDiscoveredLead: publicProcedure
     .input(
       z.object({
@@ -599,8 +615,53 @@ export const leadsRouter = router({
     .mutation(async ({ input }) => {
       console.log('\n**** [leads.ts] enrichDiscoveredLead called ****')
       console.log('[leads.ts] Input:', JSON.stringify(input, null, 2))
+
       try {
-        console.log('[leads.ts] Calling enrichLead service...')
+        // Check cache first (if website exists)
+        if (input.website) {
+          const cached = await getEnrichmentFromCache(input.website)
+
+          if (cached.cached && cached.data) {
+            console.log('[leads.ts] CACHE HIT! Using cached enrichment data')
+
+            // Re-calculate scoring with current lead's data (rating/reviews may differ)
+            const category = getLeadCategory(cached.data.leadScore || 0)
+            const opportunityValue = calculateOpportunityValue(cached.data.opportunities || [])
+
+            return {
+              success: true,
+              leadId: input.id,
+              score: cached.data.leadScore || 0,
+              category,
+              breakdown: cached.data.scoreBreakdown,
+              technologies: cached.data.technologies,
+              techSignals: null, // Will be derived from technologies
+              opportunities: cached.data.opportunities,
+              opportunityValue,
+              growthSignals: [],
+              insights: [],
+              pitchRecommendation: '',
+              websiteAnalysis: cached.data.websiteAnalysis,
+              domainInfo: cached.data.domainInfo,
+              socialMetrics: cached.data.socialMetrics,
+              emailEnrichment: null,
+              enrichedAt: cached.data.analyzedAt,
+              // Preserve social media from Google Maps scraper
+              socialMedia: {
+                instagram: input.instagram,
+                facebook: input.facebook,
+                linkedin: input.linkedin,
+                twitter: input.twitter,
+                tiktok: input.tiktok,
+                youtube: input.youtube,
+              },
+              // Indicate this was from cache
+              fromCache: true,
+            }
+          }
+        }
+
+        console.log('[leads.ts] Cache MISS - running fresh enrichment')
         console.log('[leads.ts] Existing email from Google Maps:', input.email || 'NONE')
         console.log('[leads.ts] Social media from Google Maps:', {
           instagram: input.instagram,
@@ -610,6 +671,7 @@ export const leadsRouter = router({
           tiktok: input.tiktok,
           youtube: input.youtube,
         })
+
         const enrichment = await enrichLead(input.website, input.businessName, {
           // Pass existing email - skip email scraping if present
           existingEmail: input.email,
@@ -629,6 +691,19 @@ export const leadsRouter = router({
         const category = getLeadCategory(scoring.totalScore)
         const opportunityValue = calculateOpportunityValue(scoring.opportunities)
 
+        // Save to cache for future requests (if website exists)
+        if (input.website) {
+          await saveEnrichmentToCache(input.website, {
+            technologies: enrichment.technologies,
+            websiteAnalysis: enrichment.websiteAnalysis,
+            domainInfo: enrichment.domainInfo,
+            socialMetrics: enrichment.socialMetrics,
+            leadScore: scoring.totalScore,
+            scoreBreakdown: scoring.breakdown,
+            opportunities: scoring.opportunities,
+          })
+        }
+
         return {
           success: true,
           leadId: input.id,
@@ -647,9 +722,6 @@ export const leadsRouter = router({
           socialMetrics: enrichment.socialMetrics,
           // Email enrichment data
           emailEnrichment: enrichment.emailEnrichment,
-          employeeCount: enrichment.employeeCount,
-          fundingInfo: enrichment.fundingInfo,
-          jobPostings: enrichment.jobPostings,
           enrichedAt: enrichment.enrichedAt,
           // Preserve social media from Google Maps scraper
           socialMedia: {
@@ -660,6 +732,8 @@ export const leadsRouter = router({
             tiktok: input.tiktok,
             youtube: input.youtube,
           },
+          // Indicate this was fresh
+          fromCache: false,
         }
       } catch (error) {
         console.error('Error enriching discovered lead:', error)
@@ -760,19 +834,29 @@ export const leadsRouter = router({
   }),
 
   // Search for high-intent businesses (Premium - uses 3 credits per search)
-  searchHighIntent: protectedProcedure
+  // TODO: Change back to protectedProcedure after testing
+  searchHighIntent: publicProcedure
     .input(
       z.object({
         state: z.string().min(1, 'State is required'),
         industry: z.string().min(1, 'Industry is required'),
         serviceType: z.string().min(1, 'Service type is required'),
-        maxResultsPerSource: z.number().min(5).max(50).default(15),
+        maxResultsPerSource: z.number().min(1).max(50).default(3), // Reduced from 15 for testing
       })
     )
     .mutation(async ({ input }) => {
-      console.log('[leads.ts] searchHighIntent called with:', input)
+      console.log('\n🔍 [HIGH-INTENT BACKEND] ==========================================')
+      console.log('🔍 [HIGH-INTENT BACKEND] searchHighIntent mutation called')
+      console.log('🔍 [HIGH-INTENT BACKEND] Input parameters:')
+      console.log('   - State:', input.state)
+      console.log('   - Industry:', input.industry)
+      console.log('   - Service Type:', input.serviceType)
+      console.log('   - Max Results Per Source:', input.maxResultsPerSource)
 
       try {
+        console.log('🔍 [HIGH-INTENT BACKEND] Calling searchHighIntentBusinesses service...')
+        const startTime = Date.now()
+
         const result = await searchHighIntentBusinesses(
           input.state,
           input.industry,
@@ -780,13 +864,34 @@ export const leadsRouter = router({
           input.maxResultsPerSource
         )
 
-        return {
+        const endTime = Date.now()
+        const duration = endTime - startTime
+
+        console.log('✅ [HIGH-INTENT BACKEND] searchHighIntentBusinesses completed successfully')
+        console.log('✅ [HIGH-INTENT BACKEND] Response summary:')
+        console.log('   - Total businesses found:', result.businesses?.length || 0)
+        console.log('   - Indeed results:', result.sources?.indeed || 0)
+        console.log('   - Upwork results:', result.sources?.upwork || 0)
+        console.log('   - LinkedIn results:', result.sources?.linkedin || 0)
+        console.log('   - Execution time:', duration + 'ms')
+        console.log('✅ [HIGH-INTENT BACKEND] Full result:', result)
+
+        const response = {
           success: true,
           ...result,
         }
+
+        console.log('✅ [HIGH-INTENT BACKEND] Returning response to client:', response)
+        console.log('🔍 [HIGH-INTENT BACKEND] ==========================================\n')
+
+        return response
       } catch (error: any) {
-        console.error('[leads.ts] High-intent search error:', error)
-        return {
+        console.error('❌ [HIGH-INTENT BACKEND] Error during search:', error)
+        console.error('❌ [HIGH-INTENT BACKEND] Error message:', error.message)
+        console.error('❌ [HIGH-INTENT BACKEND] Error stack:', error.stack)
+        console.error('❌ [HIGH-INTENT BACKEND] Full error object:', error)
+
+        const errorResponse = {
           success: false,
           error: error.message || 'Failed to search for high-intent businesses',
           businesses: [],
@@ -795,6 +900,11 @@ export const leadsRouter = router({
           sources: { indeed: 0, upwork: 0, linkedin: 0 },
           creditsUsed: 0,
         }
+
+        console.error('❌ [HIGH-INTENT BACKEND] Returning error response:', errorResponse)
+        console.error('🔍 [HIGH-INTENT BACKEND] ==========================================\n')
+
+        return errorResponse
       }
     }),
 })

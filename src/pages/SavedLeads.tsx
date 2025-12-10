@@ -19,6 +19,13 @@ import {
   Building2,
   CheckCircle2,
   X,
+  Instagram,
+  Facebook,
+  Linkedin,
+  Twitter,
+  Youtube,
+  Sparkles,
+  Loader2,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -39,8 +46,23 @@ import {
 } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { useLeadStore, type SavedLead } from '@/hooks/useLeadStore'
+import { useLeadAnalysis } from '@/hooks/useLeadAnalysis'
 import { LeadDetailModal } from '@/components/LeadDetailModal'
-import type { ContactMethod } from '@/types'
+import { Progress } from '@/components/ui/progress'
+import type { ContactMethod, Lead } from '@/types'
+import type { ScoringResult } from '@/lib/leadScoring'
+
+// TikTok icon component (not in lucide-react)
+const TikTokIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
+  </svg>
+)
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -76,6 +98,16 @@ export default function SavedLeads() {
   const [sortBy, setSortBy] = useState<SortOption>('newest')
   const [selectedLead, setSelectedLead] = useState<SavedLead | null>(null)
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set())
+
+  // Lead analysis hook
+  const {
+    isAnalyzing,
+    progress: analysisProgress,
+    currentLeadId,
+    analyzeLead,
+    analyzeLeads,
+    getAnalysis,
+  } = useLeadAnalysis()
 
   // Get unique categories and locations for filters
   const categories = useMemo(() => {
@@ -198,6 +230,20 @@ export default function SavedLeads() {
     } else {
       setSelectedLeads(new Set(filteredLeads.map((l) => l.id)))
     }
+  }
+
+  // Handle bulk analysis of selected leads
+  const handleBulkAnalyze = async () => {
+    if (selectedLeads.size === 0) return
+    const leadsToAnalyze = savedLeads
+      .filter((l) => selectedLeads.has(l.id))
+      .map((l) => l as Lead)
+    await analyzeLeads(leadsToAnalyze)
+  }
+
+  // Handle single lead analysis (for modal)
+  const handleAnalyzeLead = async (lead: Lead): Promise<ScoringResult | null> => {
+    return await analyzeLead(lead)
   }
 
   return (
@@ -375,6 +421,16 @@ export default function SavedLeads() {
                       <Button
                         size="sm"
                         variant="outline"
+                        onClick={handleBulkAnalyze}
+                        disabled={isAnalyzing}
+                        className="gap-1 bg-primary/5 border-primary/20 hover:bg-primary/10"
+                      >
+                        <Sparkles className="h-4 w-4 text-primary" />
+                        Analyze
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
                         onClick={handleBulkUnsave}
                         className="text-destructive hover:text-destructive"
                       >
@@ -383,6 +439,19 @@ export default function SavedLeads() {
                       </Button>
                     </div>
                   </div>
+                  {/* Analysis Progress */}
+                  {isAnalyzing && (
+                    <div className="mt-3 space-y-1">
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span className="flex items-center gap-2">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Analyzing leads...
+                        </span>
+                        <span>{analysisProgress}%</span>
+                      </div>
+                      <Progress value={analysisProgress} className="h-1.5" />
+                    </div>
+                  )}
                 </Card>
               </motion.div>
             )}
@@ -469,7 +538,7 @@ export default function SavedLeads() {
                       </div>
 
                       {/* Contact Info */}
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2 flex-wrap">
                         {lead.phone && (
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             <Phone className="h-3 w-3" />
@@ -483,6 +552,36 @@ export default function SavedLeads() {
                         {lead.website && (
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             <Globe className="h-3 w-3" />
+                          </div>
+                        )}
+                        {lead.instagram && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Instagram className="h-3 w-3" />
+                          </div>
+                        )}
+                        {lead.facebook && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Facebook className="h-3 w-3" />
+                          </div>
+                        )}
+                        {lead.linkedin && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Linkedin className="h-3 w-3" />
+                          </div>
+                        )}
+                        {lead.twitter && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Twitter className="h-3 w-3" />
+                          </div>
+                        )}
+                        {lead.tiktok && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <TikTokIcon className="h-3 w-3" />
+                          </div>
+                        )}
+                        {lead.youtube && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Youtube className="h-3 w-3" />
                           </div>
                         )}
                       </div>
@@ -572,6 +671,11 @@ export default function SavedLeads() {
         onScheduleFollowUp={() => {
           toast.info('Add to pipeline first to schedule follow-ups')
         }}
+        // Pro Intelligence analysis props
+        onAnalyze={handleAnalyzeLead}
+        isAnalyzing={isAnalyzing && currentLeadId === selectedLead?.id}
+        analysisProgress={analysisProgress}
+        scoringResult={selectedLead ? getAnalysis(selectedLead.id) : undefined}
       />
     </motion.div>
   )

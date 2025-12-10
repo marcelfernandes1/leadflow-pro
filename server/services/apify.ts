@@ -57,7 +57,23 @@ interface SearchOptions {
 
 // Helper to extract social URL from various possible response formats
 function extractSocialUrl(item: any, platform: string, socialUrls: any): string | undefined {
-  // Direct field on item
+  // Map platform names to the plural array field names that Apify actually returns
+  const pluralFieldMap: Record<string, string> = {
+    instagram: 'instagrams',
+    facebook: 'facebooks',
+    linkedin: 'linkedIns',
+    twitter: 'twitters',
+    youtube: 'youtubes',
+    tiktok: 'tiktoks',
+  }
+
+  // Check plural array fields first (this is what Apify actually returns!)
+  const pluralField = pluralFieldMap[platform]
+  if (pluralField && Array.isArray(item[pluralField]) && item[pluralField].length > 0) {
+    return item[pluralField][0] // Return first URL from the array
+  }
+
+  // Direct field on item (singular)
   if (item[platform]) return item[platform]
 
   // From socialUrls object (can be named differently)
@@ -67,6 +83,13 @@ function extractSocialUrl(item: any, platform: string, socialUrls: any): string 
   if (platform === 'twitter') {
     if (item.x) return item.x
     if (socialUrls?.x) return socialUrls.x
+    // Also check for x.com URLs in twitters array
+    if (Array.isArray(item.twitters)) {
+      const xUrl = item.twitters.find((u: string) =>
+        typeof u === 'string' && u.toLowerCase().includes('x.com')
+      )
+      if (xUrl) return xUrl
+    }
   }
 
   // From array format (array of URL strings)
@@ -107,9 +130,10 @@ export async function searchLeads(options: SearchOptions): Promise<Lead[]> {
   // With full contact and social media enrichment enabled
   const run = await client.actor('compass/crawler-google-places').call({
     searchStringsArray: [searchQuery],
-    // No maxCrawledPlacesPerSearch - search the entire region
+    // TESTING: Limit to 20 results to reduce costs
+    maxCrawledPlacesPerSearch: 20,
     language: 'en',
-    deeperCityScrape: true, // Get more results by searching deeper
+    deeperCityScrape: false, // Disabled for testing to reduce costs
     skipClosedPlaces: true,
     // Only scrape places that have a website (required for contact enrichment)
     onlyPlacesWithUrl: true,
@@ -176,6 +200,29 @@ export async function searchLeads(options: SearchOptions): Promise<Lead[]> {
     // Extract social media - check all possible object names the actor might use
     const socialUrls = item.socialUrls || item.socialMediaUrls || item.socialProfiles || item.socials || {}
 
+    // Extract social media URLs
+    const instagram = extractSocialUrl(item, 'instagram', socialUrls)
+    const facebook = extractSocialUrl(item, 'facebook', socialUrls)
+    const linkedin = extractSocialUrl(item, 'linkedin', socialUrls)
+    const twitter = extractSocialUrl(item, 'twitter', socialUrls)
+    const tiktok = extractSocialUrl(item, 'tiktok', socialUrls)
+    const youtube = extractSocialUrl(item, 'youtube', socialUrls)
+
+    // Log social media extraction for first few items
+    if (index < 3) {
+      console.log(`[Apify] Social extraction for "${item.title}":`, {
+        rawArrays: {
+          instagrams: item.instagrams,
+          facebooks: item.facebooks,
+          linkedIns: item.linkedIns,
+          twitters: item.twitters,
+          youtubes: item.youtubes,
+          tiktoks: item.tiktoks,
+        },
+        extracted: { instagram, facebook, linkedin, twitter, tiktok, youtube }
+      })
+    }
+
     return {
       id: `lead-${Date.now()}-${index}`,
       businessName: item.title || item.name || 'Unknown Business',
@@ -188,13 +235,13 @@ export async function searchLeads(options: SearchOptions): Promise<Lead[]> {
       phone: item.phone || item.phoneNumber || item.contactInfo?.phone || '',
       email,
       website: item.website || item.url || '',
-      // Social profiles - use comprehensive extraction helper
-      instagram: extractSocialUrl(item, 'instagram', socialUrls),
-      facebook: extractSocialUrl(item, 'facebook', socialUrls),
-      linkedin: extractSocialUrl(item, 'linkedin', socialUrls),
-      twitter: extractSocialUrl(item, 'twitter', socialUrls),
-      tiktok: extractSocialUrl(item, 'tiktok', socialUrls),
-      youtube: extractSocialUrl(item, 'youtube', socialUrls),
+      // Social profiles - already extracted above
+      instagram,
+      facebook,
+      linkedin,
+      twitter,
+      tiktok,
+      youtube,
       googleRating: item.totalScore || item.rating || null,
       reviewCount: item.reviewsCount || item.reviews || 0,
       businessHours: item.openingHours || {},
@@ -202,10 +249,26 @@ export async function searchLeads(options: SearchOptions): Promise<Lead[]> {
     }
   })
 
-  // Filter out leads without email - they can't be contacted effectively
-  const leads = allLeads.filter(lead => lead.email && lead.email.trim() !== '')
+  // Helper to check if lead has any social media profiles
+  function hasSocialMedia(lead: any): boolean {
+    return Boolean(
+      lead.instagram ||
+      lead.facebook ||
+      lead.linkedin ||
+      lead.twitter ||
+      lead.tiktok ||
+      lead.youtube
+    )
+  }
 
-  console.log('[Apify] Leads with emails:', leads.length, 'out of', allLeads.length, 'total')
+  // Filter leads - show if they have email OR social media accounts
+  const leads = allLeads.filter(lead => {
+    const hasEmail = lead.email && lead.email.trim() !== ''
+    const hasSocial = hasSocialMedia(lead)
+    return hasEmail || hasSocial
+  })
+
+  console.log('[Apify] Leads with contact info (email or social):', leads.length, 'out of', allLeads.length, 'total')
 
   return leads
 }

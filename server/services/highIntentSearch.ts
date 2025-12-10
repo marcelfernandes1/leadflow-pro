@@ -295,55 +295,87 @@ export async function searchHighIntentBusinesses(
   serviceType: string,
   maxResultsPerSource: number = 15
 ): Promise<HighIntentSearchResult> {
-  console.log('\n==========================================')
-  console.log('[HighIntent] Starting High-Intent Business Search')
-  console.log(`[HighIntent] State: ${state}`)
-  console.log(`[HighIntent] Industry: ${industry}`)
-  console.log(`[HighIntent] Service Type: ${serviceType}`)
-  console.log('==========================================\n')
+  console.log('\n🔍 [SERVICE] ==========================================')
+  console.log('🔍 [SERVICE] searchHighIntentBusinesses function started')
+  console.log('🔍 [SERVICE] Parameters:')
+  console.log(`   - State: ${state}`)
+  console.log(`   - Industry: ${industry}`)
+  console.log(`   - Service Type: ${serviceType}`)
+  console.log(`   - Max Results Per Source: ${maxResultsPerSource}`)
+  console.log('🔍 [SERVICE] ==========================================')
 
   // Get service keywords for the selected service type
+  console.log('🔍 [SERVICE] Building search keywords...')
   const keywords = SERVICE_KEYWORDS[serviceType] || SERVICE_KEYWORDS['Marketing']
+  console.log(`🔍 [SERVICE] Keywords for "${serviceType}":`, keywords)
 
   // Add industry-specific context
   const searchKeywords = keywords.map(k => `${k} ${industry}`.trim())
+  console.log(`🔍 [SERVICE] Combined search keywords (with industry):`, searchKeywords)
 
   // Search all platforms in parallel
+  console.log('🔍 [SERVICE] Starting parallel searches on Indeed, Upwork, and LinkedIn...')
+  const startTime = Date.now()
+
   const [indeedResults, upworkResults, linkedinResults] = await Promise.allSettled([
     searchIndeedHighIntent(state, searchKeywords, maxResultsPerSource),
     searchUpworkHighIntent(searchKeywords, maxResultsPerSource),
     searchLinkedInHighIntent(state, searchKeywords, maxResultsPerSource),
   ])
 
+  const platformTime = Date.now()
+  console.log(`🔍 [SERVICE] Platform searches completed in ${platformTime - startTime}ms`)
+  console.log('🔍 [SERVICE] Indeed results:', indeedResults.status === 'fulfilled' ? `${indeedResults.value.length} results` : 'FAILED')
+  console.log('🔍 [SERVICE] Upwork results:', upworkResults.status === 'fulfilled' ? `${upworkResults.value.length} results` : 'FAILED')
+  console.log('🔍 [SERVICE] LinkedIn results:', linkedinResults.status === 'fulfilled' ? `${linkedinResults.value.length} results` : 'FAILED')
+
   // Collect results
   const allBusinesses: HighIntentBusiness[] = []
   const sources = { indeed: 0, upwork: 0, linkedin: 0 }
 
   if (indeedResults.status === 'fulfilled') {
+    console.log(`   ✅ Added ${indeedResults.value.length} businesses from Indeed`)
     allBusinesses.push(...indeedResults.value)
     sources.indeed = indeedResults.value.length
+  } else {
+    console.log(`   ❌ Indeed search failed:`, (indeedResults as any).reason)
   }
 
   if (upworkResults.status === 'fulfilled') {
+    console.log(`   ✅ Added ${upworkResults.value.length} businesses from Upwork`)
     allBusinesses.push(...upworkResults.value)
     sources.upwork = upworkResults.value.length
+  } else {
+    console.log(`   ❌ Upwork search failed:`, (upworkResults as any).reason)
   }
 
   if (linkedinResults.status === 'fulfilled') {
+    console.log(`   ✅ Added ${linkedinResults.value.length} businesses from LinkedIn`)
     allBusinesses.push(...linkedinResults.value)
     sources.linkedin = linkedinResults.value.length
+  } else {
+    console.log(`   ❌ LinkedIn search failed:`, (linkedinResults as any).reason)
   }
 
+  console.log(`🔍 [SERVICE] Total businesses before deduplication: ${allBusinesses.length}`)
+
   // Deduplicate by company name (case-insensitive)
+  console.log('🔍 [SERVICE] Deduplicating by company name...')
   const seen = new Set<string>()
   const uniqueBusinesses = allBusinesses.filter(b => {
     const key = b.companyName.toLowerCase().trim()
-    if (seen.has(key)) return false
+    if (seen.has(key)) {
+      console.log(`   🔄 Duplicate removed: ${b.companyName}`)
+      return false
+    }
     seen.add(key)
     return true
   })
 
+  console.log(`🔍 [SERVICE] Total unique businesses after deduplication: ${uniqueBusinesses.length}`)
+
   // Sort by posting date (most recent first)
+  console.log('🔍 [SERVICE] Sorting by posting date (newest first)...')
   uniqueBusinesses.sort((a, b) =>
     new Date(b.postedDate).getTime() - new Date(a.postedDate).getTime()
   )
@@ -351,10 +383,14 @@ export async function searchHighIntentBusinesses(
   // Calculate credits used (1 credit per source searched)
   const creditsUsed = 3 // Always 3 sources
 
-  console.log(`\n[HighIntent] Search complete!`)
-  console.log(`[HighIntent] Total unique businesses: ${uniqueBusinesses.length}`)
-  console.log(`[HighIntent] Sources: Indeed=${sources.indeed}, Upwork=${sources.upwork}, LinkedIn=${sources.linkedin}`)
-  console.log(`[HighIntent] Credits used: ${creditsUsed}\n`)
+  const totalTime = Date.now() - startTime
+  console.log('\n✅ [SERVICE] Search complete!')
+  console.log('✅ [SERVICE] Final Results:')
+  console.log(`   - Total unique businesses: ${uniqueBusinesses.length}`)
+  console.log(`   - Indeed: ${sources.indeed} | Upwork: ${sources.upwork} | LinkedIn: ${sources.linkedin}`)
+  console.log(`   - Credits used: ${creditsUsed}`)
+  console.log(`   - Total execution time: ${totalTime}ms`)
+  console.log('🔍 [SERVICE] ==========================================\n')
 
   return {
     businesses: uniqueBusinesses,

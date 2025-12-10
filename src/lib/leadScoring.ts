@@ -46,8 +46,6 @@ const GROWTH_INDICATORS = ['Marketing Automation', 'Chat/Support']
 export interface EnrichmentData {
   technologies: string[]
   domainAge?: number // years
-  employeeCount?: number
-  jobPostings?: Array<{ title: string; date: string; source: string }>
   performanceScore?: number // 0-100
   isMobileFriendly?: boolean
   socialFollowers?: {
@@ -57,8 +55,6 @@ export interface EnrichmentData {
     twitter?: number
   }
   lastWebsiteUpdate?: string
-  hasRecentFunding?: boolean
-  fundingAmount?: number
 }
 
 export interface TechnologyInfo {
@@ -229,57 +225,14 @@ function analyzeTechnologyGaps(technologies: string[]): {
   return { technologyScore: score, techOpportunities: opportunities, techInsights: insights }
 }
 
-function analyzeGrowthSignals(enrichmentData: EnrichmentData): {
+function analyzeGrowthSignals(_enrichmentData: EnrichmentData): {
   growthScore: number
   signals: GrowthSignal[]
   growthInsights: string[]
 } {
-  let score = 0
-  const signals: GrowthSignal[] = []
-  const insights: string[] = []
-
-  // Job postings indicate growth
-  if (enrichmentData.jobPostings && enrichmentData.jobPostings.length > 0) {
-    score += 15
-
-    enrichmentData.jobPostings.forEach((job) => {
-      signals.push({
-        type: 'job_posting',
-        title: job.title,
-        date: job.date,
-        details: `Posted on ${job.source}`,
-      })
-    })
-
-    insights.push(`Actively hiring (${enrichmentData.jobPostings.length} open positions)`)
-  }
-
-  // Employee count growth
-  if (enrichmentData.employeeCount) {
-    if (enrichmentData.employeeCount >= 10 && enrichmentData.employeeCount <= 50) {
-      score += 8
-      insights.push('Sweet spot company size for scaling')
-    } else if (enrichmentData.employeeCount >= 50 && enrichmentData.employeeCount <= 200) {
-      score += 5
-      insights.push('Growing mid-size company')
-    }
-  }
-
-  // Recent funding
-  if (enrichmentData.hasRecentFunding) {
-    score += 7
-    signals.push({
-      type: 'funding',
-      title: enrichmentData.fundingAmount
-        ? `Raised $${(enrichmentData.fundingAmount / 1000000).toFixed(1)}M`
-        : 'Recent funding',
-      date: new Date().toISOString(),
-      details: 'Has budget for new tools',
-    })
-    insights.push('Recently funded - likely has budget')
-  }
-
-  return { growthScore: score, signals, growthInsights: insights }
+  // Growth signals analysis simplified for local businesses
+  // Future: Could add signals like new location openings, seasonal hiring, etc.
+  return { growthScore: 0, signals: [], growthInsights: [] }
 }
 
 function analyzeBudgetSignals(lead: Lead, enrichmentData: EnrichmentData): {
@@ -377,25 +330,15 @@ function getAverageCategoryValue(category: string): number {
 function generatePitchRecommendation(
   lead: Lead,
   opportunities: Opportunity[],
-  growthSignals: GrowthSignal[],
+  _growthSignals: GrowthSignal[],
   _score: number
 ): string {
   const topOpportunity = opportunities.sort((a, b) => b.value - a.value)[0]
-  const hasJobPostings = growthSignals.some((s) => s.type === 'job_posting')
-  const hasFunding = growthSignals.some((s) => s.type === 'funding')
 
   let pitch = `Hi! I noticed ${lead.businessName}`
 
   if (topOpportunity) {
     pitch += ` doesn't seem to have a ${topOpportunity.tool} solution in place`
-  }
-
-  if (hasJobPostings) {
-    pitch += `, and I see you're growing your team`
-  }
-
-  if (hasFunding) {
-    pitch += `. Congrats on the recent funding`
   }
 
   pitch += `. I help businesses like yours `
@@ -439,16 +382,167 @@ export function calculateOpportunityValue(opportunities: Opportunity[]): {
   }
 }
 
+// Service pricing range for review automation services
+const SERVICE_PRICE_MIN = 500 // $500/month
+const SERVICE_PRICE_MAX = 1000 // $1000/month
+const SERVICE_PRICE_AVG = (SERVICE_PRICE_MIN + SERVICE_PRICE_MAX) / 2 // $750/month
+
+/**
+ * Calculate review-based opportunity score
+ * Low stars and low reviews = high opportunity for review automation services
+ * Returns a score from 0-100 and an estimated lead value
+ */
+export function calculateReviewOpportunity(
+  googleRating: number | undefined | null,
+  reviewCount: number | undefined | null
+): {
+  score: number
+  leadValue: number
+  opportunityLevel: 'high' | 'medium' | 'low' | 'none'
+  reason: string
+} {
+  // Default values if no data
+  if (!googleRating && !reviewCount) {
+    return {
+      score: 50,
+      leadValue: SERVICE_PRICE_AVG,
+      opportunityLevel: 'medium',
+      reason: 'No review data - potential opportunity'
+    }
+  }
+
+  let score = 0
+  const reasons: string[] = []
+
+  // Rating-based scoring (lower is better for our service)
+  // Missing rating = opportunity
+  if (!googleRating) {
+    score += 40
+    reasons.push('No Google rating')
+  } else if (googleRating < 3.0) {
+    score += 50
+    reasons.push('Very low rating - urgent need')
+  } else if (googleRating < 3.5) {
+    score += 40
+    reasons.push('Below average rating')
+  } else if (googleRating < 4.0) {
+    score += 30
+    reasons.push('Room for improvement')
+  } else if (googleRating < 4.5) {
+    score += 15
+    reasons.push('Good but could be better')
+  } else {
+    score += 5
+    reasons.push('Excellent rating')
+  }
+
+  // Review count scoring (fewer reviews = more opportunity)
+  if (!reviewCount || reviewCount === 0) {
+    score += 50
+    reasons.push('No reviews')
+  } else if (reviewCount < 10) {
+    score += 45
+    reasons.push('Very few reviews')
+  } else if (reviewCount < 25) {
+    score += 35
+    reasons.push('Low review count')
+  } else if (reviewCount < 50) {
+    score += 25
+    reasons.push('Moderate reviews')
+  } else if (reviewCount < 100) {
+    score += 15
+    reasons.push('Decent review count')
+  } else {
+    score += 5
+    reasons.push('Strong review presence')
+  }
+
+  // Cap at 100
+  score = Math.min(100, score)
+
+  // Calculate lead value based on score
+  // Higher score = higher value (more likely to need our service)
+  // Scale from $500 (low opportunity) to $1000 (high opportunity)
+  const valueMultiplier = score / 100
+  const leadValue = Math.round(
+    SERVICE_PRICE_MIN + (SERVICE_PRICE_MAX - SERVICE_PRICE_MIN) * valueMultiplier
+  )
+
+  // Determine opportunity level
+  let opportunityLevel: 'high' | 'medium' | 'low' | 'none'
+  if (score >= 70) {
+    opportunityLevel = 'high'
+  } else if (score >= 45) {
+    opportunityLevel = 'medium'
+  } else if (score >= 20) {
+    opportunityLevel = 'low'
+  } else {
+    opportunityLevel = 'none'
+  }
+
+  return {
+    score,
+    leadValue,
+    opportunityLevel,
+    reason: reasons.join(', ')
+  }
+}
+
+/**
+ * Calculate pipeline potential value for a list of leads
+ * Based on review automation service pricing ($500-$1000/mo)
+ * Assumes 1% close rate
+ */
+export function calculatePipelinePotential(
+  leads: Array<{ googleRating?: number | null; reviewCount?: number | null }>
+): {
+  totalLeads: number
+  totalPipelineValue: number
+  avgLeadValue: number
+  expectedCloses: number
+  monthlyPotential: number
+  closeRate: number
+} {
+  const CLOSE_RATE = 0.01 // 1% close rate
+
+  if (leads.length === 0) {
+    return {
+      totalLeads: 0,
+      totalPipelineValue: 0,
+      avgLeadValue: 0,
+      expectedCloses: 0,
+      monthlyPotential: 0,
+      closeRate: CLOSE_RATE
+    }
+  }
+
+  // Calculate individual lead values based on review opportunity
+  const leadValues = leads.map(lead =>
+    calculateReviewOpportunity(lead.googleRating, lead.reviewCount).leadValue
+  )
+
+  const totalPipelineValue = leadValues.reduce((sum, val) => sum + val, 0)
+  const avgLeadValue = Math.round(totalPipelineValue / leads.length)
+  const expectedCloses = Math.max(1, Math.round(leads.length * CLOSE_RATE))
+  const monthlyPotential = Math.round(expectedCloses * avgLeadValue)
+
+  return {
+    totalLeads: leads.length,
+    totalPipelineValue,
+    avgLeadValue,
+    expectedCloses,
+    monthlyPotential,
+    closeRate: CLOSE_RATE
+  }
+}
+
 /**
  * Convert backend enrichment result to frontend EnrichmentData format
  */
 export function convertEnrichmentResult(result: {
   technologies?: Array<{ name: string; category: string }>
-  jobPostings?: Array<{ title: string; date: string; source: string }>
   websiteAnalysis?: { performanceScore: number; isMobileFriendly: boolean } | null
   domainInfo?: { age: number } | null
-  employeeCount?: number | null
-  fundingInfo?: { hasRecentFunding: boolean; amount?: number } | null
   socialMetrics?: {
     instagram?: { followers: number; following: number; mediaCount: number; isBusiness: boolean }
     facebook?: { rating?: number; reviewCount?: number; likes?: number; followers?: number }
@@ -458,12 +552,8 @@ export function convertEnrichmentResult(result: {
   return {
     technologies: result.technologies?.map(t => t.name) || [],
     domainAge: result.domainInfo?.age,
-    employeeCount: result.employeeCount ?? undefined,
-    jobPostings: result.jobPostings || [],
     performanceScore: result.websiteAnalysis?.performanceScore,
     isMobileFriendly: result.websiteAnalysis?.isMobileFriendly,
-    hasRecentFunding: result.fundingInfo?.hasRecentFunding || false,
-    fundingAmount: result.fundingInfo?.amount,
     socialFollowers: result.socialMetrics ? {
       instagram: result.socialMetrics.instagram?.followers,
       facebook: result.socialMetrics.facebook?.followers,

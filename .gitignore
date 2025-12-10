@@ -35,3 +35,10 @@ coverage/
 # Misc
 .cache/
 *.tsbuildinfo
+
+# Python
+tech-detector/venv/
+__pycache__/
+*.pyc
+*.pyo
+.Python

@@ -216,6 +216,55 @@ export const jobPostingsCache = mysqlTable(
   })
 )
 
+// Enrichment Cache table - shared cache for website analysis across all users
+export const enrichmentCache = mysqlTable(
+  'enrichment_cache',
+  {
+    id: int('id').primaryKey().autoincrement(),
+    // Use normalized website URL as key (without protocol, trailing slash, www)
+    websiteKey: varchar('website_key', { length: 500 }).notNull().unique(),
+    originalUrl: varchar('original_url', { length: 500 }).notNull(),
+
+    // Tech Stack Analysis Results
+    technologies: json('technologies'), // Array of detected technologies
+    techSummary: json('tech_summary'), // Summary by category
+    gapAnalysis: json('gap_analysis'), // Missing tools and opportunities
+
+    // Website Analysis Results
+    websiteAnalysis: json('website_analysis'), // Mobile-friendly, SSL, page speed, etc.
+
+    // Domain Info
+    domainInfo: json('domain_info'), // Domain age, registrar, etc.
+
+    // Social Metrics (if scraped)
+    socialMetrics: json('social_metrics'),
+
+    // Scoring Results
+    leadScore: int('lead_score'),
+    scoreBreakdown: json('score_breakdown'),
+    opportunities: json('opportunities'),
+
+    // Cache Management
+    analysisStatus: mysqlEnum('analysis_status', [
+      'pending',
+      'processing',
+      'completed',
+      'failed',
+    ]).default('pending'),
+    errorMessage: text('error_message'),
+    analyzedAt: timestamp('analyzed_at'),
+    expiresAt: timestamp('expires_at').notNull(), // 60 days TTL
+    hitCount: int('hit_count').default(0), // Track cache hits
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    websiteKeyIdx: index('idx_website_key').on(table.websiteKey),
+    statusIdx: index('idx_status').on(table.analysisStatus),
+    expiresIdx: index('idx_expires').on(table.expiresAt),
+  })
+)
+
 // Type exports
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
@@ -226,3 +275,5 @@ export type LeadActivity = typeof leadActivities.$inferSelect
 export type ScrapingJob = typeof scrapingJobs.$inferSelect
 export type JobPostingsCache = typeof jobPostingsCache.$inferSelect
 export type NewJobPostingsCache = typeof jobPostingsCache.$inferInsert
+export type EnrichmentCache = typeof enrichmentCache.$inferSelect
+export type NewEnrichmentCache = typeof enrichmentCache.$inferInsert

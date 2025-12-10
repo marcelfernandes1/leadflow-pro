@@ -58,7 +58,7 @@ export interface Opportunity {
 }
 
 export interface GrowthSignal {
-  type: 'job_posting' | 'funding' | 'expansion' | 'hiring'
+  type: 'expansion'
   title: string
   date: string
   details: string
@@ -213,62 +213,14 @@ function analyzeTechnologyGaps(technologies: TechnologyInfo[]): {
   return { score, opportunities, insights }
 }
 
-function analyzeGrowthSignals(enrichment: EnrichmentResult): {
+function analyzeGrowthSignals(_enrichment: EnrichmentResult): {
   score: number
   signals: GrowthSignal[]
   insights: string[]
 } {
-  let score = 0
-  const signals: GrowthSignal[] = []
-  const insights: string[] = []
-
-  // Job postings indicate growth
-  if (enrichment.jobPostings && enrichment.jobPostings.length > 0) {
-    score += 15
-
-    enrichment.jobPostings.forEach((job) => {
-      signals.push({
-        type: 'job_posting',
-        title: job.title,
-        date: job.date,
-        details: `Posted on ${job.source}`,
-      })
-    })
-
-    insights.push(
-      `Actively hiring (${enrichment.jobPostings.length} open positions)`
-    )
-  }
-
-  // Employee count analysis
-  if (enrichment.employeeCount) {
-    if (enrichment.employeeCount >= 10 && enrichment.employeeCount <= 50) {
-      score += 8
-      insights.push('Sweet spot company size for scaling')
-    } else if (
-      enrichment.employeeCount >= 50 &&
-      enrichment.employeeCount <= 200
-    ) {
-      score += 5
-      insights.push('Growing mid-size company')
-    }
-  }
-
-  // Recent funding
-  if (enrichment.fundingInfo?.hasRecentFunding) {
-    score += 7
-    signals.push({
-      type: 'funding',
-      title: enrichment.fundingInfo.amount
-        ? `Raised $${(enrichment.fundingInfo.amount / 1000000).toFixed(1)}M`
-        : 'Recent funding',
-      date: enrichment.fundingInfo.date || new Date().toISOString(),
-      details: 'Has budget for new tools',
-    })
-    insights.push('Recently funded - likely has budget')
-  }
-
-  return { score, signals, insights }
+  // Growth signals analysis simplified for local businesses
+  // Future: Could add signals like new location openings, seasonal hiring, etc.
+  return { score: 0, signals: [], insights: [] }
 }
 
 function analyzeBudgetSignals(enrichment: EnrichmentResult): {
@@ -371,21 +323,6 @@ function analyzeTimingSignals(enrichment: EnrichmentResult): {
     }
   }
 
-  // Recent job postings timing
-  if (enrichment.jobPostings && enrichment.jobPostings.length > 0) {
-    const recentJobs = enrichment.jobPostings.filter((job) => {
-      const jobDate = new Date(job.date)
-      const daysAgo =
-        (Date.now() - jobDate.getTime()) / (1000 * 60 * 60 * 24)
-      return daysAgo <= 14
-    })
-
-    if (recentJobs.length > 0) {
-      score += 5
-      insights.push('Very recent job postings - actively expanding')
-    }
-  }
-
   return { score, insights }
 }
 
@@ -402,25 +339,15 @@ function getAverageCategoryValue(category: string): number {
 function generatePitchRecommendation(
   businessName: string,
   opportunities: Opportunity[],
-  growthSignals: GrowthSignal[],
+  _growthSignals: GrowthSignal[],
   _score: number
 ): string {
   const topOpportunity = opportunities.sort((a, b) => b.value - a.value)[0]
-  const hasJobPostings = growthSignals.some((s) => s.type === 'job_posting')
-  const hasFunding = growthSignals.some((s) => s.type === 'funding')
 
   let pitch = `Hi! I noticed ${businessName}`
 
   if (topOpportunity) {
     pitch += ` doesn't seem to have a ${topOpportunity.tool} solution in place`
-  }
-
-  if (hasJobPostings) {
-    pitch += `, and I see you're growing your team`
-  }
-
-  if (hasFunding) {
-    pitch += `. Congrats on the recent funding`
   }
 
   pitch += `. I help businesses like yours `

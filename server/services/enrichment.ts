@@ -1,6 +1,5 @@
 import { ApifyClient } from 'apify-client'
 import {
-  scrapeEmailsFromWebsite,
   getBestBusinessEmail,
   type DiscoveredEmail,
 } from './emailDiscovery.js'
@@ -8,111 +7,17 @@ import {
   verifyEmail,
   type EmailVerificationResult,
 } from './emailVerification.js'
+import {
+  detectTechStackLocal,
+  isTechDetectorHealthy,
+} from './techDetector.js'
 
 const client = new ApifyClient({
   token: process.env.APIFY_API_TOKEN,
 })
 
-// ==========================================
-// JOB POSTINGS CACHE (60-day TTL)
-// ==========================================
-const JOB_CACHE_TTL_MS = 60 * 24 * 60 * 60 * 1000 // 60 days in milliseconds
-
-interface JobCacheEntry {
-  jobs: JobPosting[]
-  scrapedAt: number
-  expiresAt: number
-}
-
-// In-memory cache for job postings
-const jobPostingsCache = new Map<string, JobCacheEntry>()
-
-/**
- * Normalize company name for cache key
- */
-function normalizeCompanyName(name: string): string {
-  return name.toLowerCase().trim().replace(/[^a-z0-9]/g, '')
-}
-
-/**
- * Check if a cache entry is still valid
- */
-function isCacheValid(entry: JobCacheEntry): boolean {
-  return Date.now() < entry.expiresAt
-}
-
-/**
- * Get cached job postings for a company
- */
-function getCachedJobPostings(companyName: string): JobPosting[] | null {
-  const key = normalizeCompanyName(companyName)
-  const entry = jobPostingsCache.get(key)
-
-  if (entry && isCacheValid(entry)) {
-    console.log(`[Job Cache] HIT for "${companyName}" - ${entry.jobs.length} jobs (expires in ${Math.round((entry.expiresAt - Date.now()) / (1000 * 60 * 60 * 24))} days)`)
-    return entry.jobs
-  }
-
-  // Remove expired entry if exists
-  if (entry) {
-    console.log(`[Job Cache] EXPIRED for "${companyName}" - removing`)
-    jobPostingsCache.delete(key)
-  }
-
-  return null
-}
-
-/**
- * Cache job postings for a company
- */
-function cacheJobPostings(companyName: string, jobs: JobPosting[]): void {
-  const key = normalizeCompanyName(companyName)
-  const now = Date.now()
-
-  jobPostingsCache.set(key, {
-    jobs,
-    scrapedAt: now,
-    expiresAt: now + JOB_CACHE_TTL_MS,
-  })
-
-  console.log(`[Job Cache] STORED ${jobs.length} jobs for "${companyName}" (expires in 60 days)`)
-}
-
-/**
- * Clear expired entries from cache (call periodically)
- */
-export function cleanupJobCache(): void {
-  let removed = 0
-  const keysToRemove: string[] = []
-
-  jobPostingsCache.forEach((entry, key) => {
-    if (!isCacheValid(entry)) {
-      keysToRemove.push(key)
-    }
-  })
-
-  keysToRemove.forEach((key) => {
-    jobPostingsCache.delete(key)
-    removed++
-  })
-
-  if (removed > 0) {
-    console.log(`[Job Cache] Cleaned up ${removed} expired entries`)
-  }
-}
-
-/**
- * Get cache statistics
- */
-export function getJobCacheStats(): { size: number; totalJobs: number } {
-  let totalJobs = 0
-  jobPostingsCache.forEach((entry) => {
-    if (isCacheValid(entry)) {
-      totalJobs += entry.jobs.length
-    }
-  })
-  return { size: jobPostingsCache.size, totalJobs }
-}
+// Track if local tech detector is available
+let localTechDetectorAvailable: boolean | null = null
 
 // Types for enrichment data
 export interface TechnologyInfo {
@@ -120,15 +25,6 @@ export interface TechnologyInfo {
   category: string
   detected: boolean
   version?: string
-}
-
-export interface JobPosting {
-  title: string
-  date: string
-  source: 'Indeed' | 'Upwork'
-  url?: string
-  budget?: string // For Upwork jobs
-  skills?: string[] // For Upwork jobs
 }
 
 export interface WebsiteAnalysis {
@@ -173,17 +69,10 @@ export interface EmailEnrichment {
 export interface EnrichmentResult {
   technologies: TechnologyInfo[]
   techSignals: TechSignals | null
-  jobPostings: JobPosting[]
   websiteAnalysis: WebsiteAnalysis | null
   domainInfo: DomainInfo | null
   socialMetrics: SocialMetrics | null
   emailEnrichment: EmailEnrichment | null
-  employeeCount: number | null
-  fundingInfo: {
-    hasRecentFunding: boolean
-    amount?: number
-    date?: string
-  } | null
   enrichedAt: string
 }
 
@@ -241,17 +130,55 @@ const TECHNOLOGY_CATEGORIES: Record<string, string[]> = {
 
 /**
  * Detect technology stack for a website
- * Uses Apify's website tech detector
+ * Uses local Scrapy-based detector first, falls back to Apify Wappalyzer
  */
 export async function detectTechStack(
   websiteUrl: string
 ): Promise<TechnologyInfo[]> {
+  // Ensure URL has protocol
+  const url = websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`
+
+  // Check if local tech detector is available (cached)
+  if (localTechDetectorAvailable === null) {
+    localTechDetectorAvailable = await isTechDetectorHealthy()
+    console.log(`[Tech Stack] Local detector available: ${localTechDetectorAvailable}`)
+  }
+
+  // Try local detector first (no API costs, faster)
+  if (localTechDetectorAvailable) {
+    try {
+      const result = await detectTechStackLocal(url)
+
+      if (result.success && result.technologies.length > 0) {
+        const technologies: TechnologyInfo[] = result.technologies.map((tech) => ({
+          name: tech.name,
+          category: tech.category,
+          detected: true,
+          version: undefined,
+        }))
+
+        console.log(`[Tech Stack] Local detector found ${technologies.length} technologies for ${websiteUrl}`)
+        return technologies
+      }
+
+      // If local detector failed or found nothing, continue to fallback
+      if (!result.success) {
+        console.warn(`[Tech Stack] Local detector error: ${result.error}`)
+      }
+    } catch (error) {
+      console.warn('[Tech Stack] Local detector failed, falling back to Apify:', error)
+      // Mark as unavailable temporarily
+      localTechDetectorAvailable = false
+    }
+  }
+
+  // Fallback to Apify Wappalyzer
   try {
     const run = await client
-      .actor('benthepythondev/website-tech-detector')
+      .actor('topaz/wappalyzer')
       .call({
-        url: websiteUrl,
-        timeout: 30,
+        urls: [url],
+        maxRequestsPerCrawl: 1,
       })
 
     const { items } = await client.dataset(run.defaultDatasetId).listItems()
@@ -259,21 +186,23 @@ export async function detectTechStack(
     const technologies: TechnologyInfo[] = []
 
     items.forEach((item: any) => {
+      // Wappalyzer returns technologies in a 'technologies' array
       if (item.technologies && Array.isArray(item.technologies)) {
         item.technologies.forEach((tech: any) => {
-          const techName = typeof tech === 'string' ? tech : tech.name
+          const techName = tech.name || tech
           if (techName) {
             technologies.push({
               name: techName,
-              category: categorizeTechnology(techName.toLowerCase()),
+              category: tech.categories?.[0]?.name || categorizeTechnology(techName.toLowerCase()),
               detected: true,
-              version: typeof tech === 'object' ? tech.version : undefined,
+              version: tech.version || undefined,
             })
           }
         })
       }
     })
 
+    console.log(`[Tech Stack] Apify detected ${technologies.length} technologies for ${websiteUrl}`)
     return technologies
   } catch (error) {
     console.error('Error detecting tech stack:', error)
@@ -351,95 +280,6 @@ export async function getDomainInfo(domain: string): Promise<DomainInfo | null> 
 }
 
 /**
- * Search for job postings on Indeed
- */
-export async function searchIndeedJobs(
-  companyName: string
-): Promise<JobPosting[]> {
-  try {
-    const run = await client.actor('misceres/indeed-scraper').call({
-      queries: [companyName],
-      maxResults: 10,
-      country: 'US',
-    })
-
-    const { items } = await client.dataset(run.defaultDatasetId).listItems()
-
-    return items.map((item: any) => ({
-      title: item.title || 'Unknown Position',
-      date: item.postedAt || new Date().toISOString(),
-      source: 'Indeed' as const,
-      url: item.url,
-    }))
-  } catch (error) {
-    console.error('Error searching Indeed jobs:', error)
-    return []
-  }
-}
-
-/**
- * Search for job postings on Upwork
- * PRD: neatrat/upwork-job-scraper
- */
-export async function searchUpworkJobs(
-  searchQuery: string
-): Promise<JobPosting[]> {
-  try {
-    const run = await client.actor('neatrat/upwork-job-scraper').call({
-      searchQuery,
-      country: 'United States',
-      maxResults: 10,
-    })
-
-    const { items } = await client.dataset(run.defaultDatasetId).listItems()
-
-    return items.map((item: any) => ({
-      title: item.title || 'Unknown Project',
-      date: item.postedDate || new Date().toISOString(),
-      source: 'Upwork' as const,
-      url: item.url,
-      budget: item.budget || item.hourlyRate,
-      skills: item.skills || [],
-    }))
-  } catch (error) {
-    console.error('Error searching Upwork jobs:', error)
-    return []
-  }
-}
-
-/**
- * Search for job postings across multiple sources
- * Results are cached for 60 days to reduce API calls
- */
-export async function searchJobPostings(
-  companyName: string
-): Promise<JobPosting[]> {
-  // Check cache first
-  const cachedJobs = getCachedJobPostings(companyName)
-  if (cachedJobs !== null) {
-    return cachedJobs
-  }
-
-  console.log(`[Job Cache] MISS for "${companyName}" - fetching from APIs...`)
-
-  // Run both Indeed and Upwork searches in parallel
-  const [indeedJobs, upworkJobs] = await Promise.all([
-    searchIndeedJobs(companyName),
-    searchUpworkJobs(companyName),
-  ])
-
-  // Combine and sort by date (most recent first)
-  const allJobs = [...indeedJobs, ...upworkJobs].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-  )
-
-  // Cache the results
-  cacheJobPostings(companyName, allJobs)
-
-  return allJobs
-}
-
-/**
  * Lead data for enrichment
  * Simplified - social metrics come from Google Maps scraper directly
  */
@@ -472,44 +312,28 @@ export async function enrichLead(
   const result: EnrichmentResult = {
     technologies: [],
     techSignals: null,
-    jobPostings: [],
     websiteAnalysis: null,
     domainInfo: null,
     socialMetrics: null,
     emailEnrichment: null,
-    employeeCount: null,
-    fundingInfo: null,
     enrichedAt: new Date().toISOString(),
   }
 
   // Run enrichment tasks in parallel where possible
   const promises: Promise<void>[] = []
 
-  // Email discovery - SKIP if we already have an email from Google Maps scraper
+  // Email discovery - Use only email from Google Maps scraper, no website scraping
   let discoveredEmails: DiscoveredEmail[] = []
   if (options?.existingEmail) {
-    // Use existing email from Google Maps scraper - no need to scrape again
-    console.log('[Enrichment] Using existing email from Google Maps scraper:', options.existingEmail)
+    // Use existing email from Google Maps scraper
+    console.log('[Enrichment] Using email from Google Maps scraper:', options.existingEmail)
     discoveredEmails = [{
       email: options.existingEmail,
       source: 'website' as const,
-      confidence: 'high' as const, // Trust Google Maps data
+      confidence: 'high' as const,
     }]
-  } else if (website) {
-    // No email from Google Maps - fall back to separate email scraping
-    console.log('[Enrichment] No existing email, starting email scraping from website...')
-    promises.push(
-      scrapeEmailsFromWebsite(website)
-        .then((emailResult) => {
-          console.log('[Enrichment] Email scraping complete. Found:', emailResult.emails.length, 'emails')
-          discoveredEmails = emailResult.emails
-        })
-        .catch((err) => {
-          console.error('[Enrichment] Email scraping FAILED:', err.message)
-        })
-    )
   } else {
-    console.log('[Enrichment] No email and no website - skipping email discovery')
+    console.log('[Enrichment] No email from Google Maps - skipping email enrichment')
   }
 
   // Technology detection (if website exists) - Pro feature
@@ -533,7 +357,7 @@ export async function enrichLead(
     }
   }
 
-  // Wait for all enrichment tasks (including email discovery)
+  // Wait for all enrichment tasks
   await Promise.allSettled(promises)
 
   // Email verification (after discovery is complete)
@@ -561,9 +385,6 @@ export async function enrichLead(
   if (result.technologies.length > 0) {
     result.techSignals = extractTechSignals(result.technologies, null)
   }
-
-  // Funding info is an Enterprise feature - requires Crunchbase API
-  result.fundingInfo = { hasRecentFunding: false }
 
   return result
 }
@@ -649,4 +470,3 @@ function extractDomain(url: string): string | null {
     return null
   }
 }
-

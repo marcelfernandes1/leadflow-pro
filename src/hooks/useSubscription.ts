@@ -39,9 +39,14 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
 export function useSubscription() {
   const { user, isLoaded } = useUser()
 
-  // Get subscription tier from Clerk user metadata
+  // DEMO MODE: Check localStorage for mock subscription tier first
+  const mockTier = typeof window !== 'undefined'
+    ? (localStorage.getItem('mockSubscriptionTier') as SubscriptionTier | null)
+    : null
+
+  // Use mock tier if exists, otherwise get from Clerk user metadata
   // Default to 'free' if not set
-  const tier = (user?.publicMetadata?.subscriptionTier as SubscriptionTier) || 'free'
+  const tier = mockTier || (user?.publicMetadata?.subscriptionTier as SubscriptionTier) || 'free'
   const limits = TIER_LIMITS[tier]
 
   // Get usage from metadata (you'd track this server-side typically)

@@ -25,6 +25,9 @@ import {
   ArrowRight,
   Bookmark,
   BookmarkCheck,
+  DollarSign,
+  Target,
+  Percent,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -47,6 +50,8 @@ import {
   convertEnrichmentResult,
   getLeadCategory,
   calculateOpportunityValue,
+  calculatePipelinePotential,
+  calculateReviewOpportunity,
   type ScoringResult,
 } from '@/lib/leadScoring'
 import { IntelligenceReportModal } from '@/components/IntelligenceReportModal'
@@ -656,11 +661,8 @@ export default function LeadDiscovery() {
           if (calculateScores) {
             const enrichmentData = convertEnrichmentResult({
               technologies: data.technologies,
-              jobPostings: data.jobPostings,
               websiteAnalysis: data.websiteAnalysis,
               domainInfo: data.domainInfo,
-              employeeCount: data.employeeCount,
-              fundingInfo: data.fundingInfo,
               socialMetrics: data.socialMetrics,
             })
             const scoringResult = calculateLeadScore(lead, enrichmentData)
@@ -688,8 +690,8 @@ export default function LeadDiscovery() {
         description: `Analyzed ${newScores.size} leads with real-time data`,
       })
     } else {
-      toast.success('Lead enrichment complete!', {
-        description: `Found ${emailsFound} emails from business websites`,
+      toast.success('Email verification complete!', {
+        description: `Verified ${emailsFound} emails from Google Maps`,
       })
     }
   }
@@ -960,6 +962,11 @@ export default function LeadDiscovery() {
     })
   }, [discoveredLeads, leadScores, proEnabled])
 
+  // Calculate pipeline potential based on review automation opportunity
+  const pipelinePotential = useMemo(() => {
+    return calculatePipelinePotential(sortedLeads)
+  }, [sortedLeads])
+
   const getScoreBadgeVariant = (score: number): 'hot' | 'warm' | 'cold' | 'outline' => {
     const category = getLeadCategory(score)
     switch (category) {
@@ -980,11 +987,14 @@ export default function LeadDiscovery() {
   }
 
   const handleUpgrade = () => {
-    // For testing: Enable Pro mode immediately
-    // In production, this would redirect to Stripe and wait for webhook confirmation
+    // DEMO MODE: Set localStorage mock subscription tier
+    localStorage.setItem('mockSubscriptionTier', 'pro')
+    localStorage.setItem('mockTrialStartedAt', new Date().toISOString())
+    localStorage.setItem('mockTrialEndsAt', new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString())
+
     setProEnabled(true)
     setShowUpgradeModal(false)
-    toast.success('Pro Intelligence activated!', {
+    toast.success('Pro Intelligence activated! (Demo Mode)', {
       description: 'You now have access to AI-powered lead scoring and tech analysis.',
     })
   }
@@ -1017,8 +1027,8 @@ export default function LeadDiscovery() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
       >
-        <Card variant="default" className="overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-cold/5" />
+        <Card variant="default" className="overflow-visible relative z-20">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-cold/5 rounded-xl" />
           <CardHeader className="relative">
             <CardTitle className="flex items-center gap-3 text-lg">
               <div className="p-2 rounded-lg bg-gradient-to-br from-primary to-cold">
@@ -1071,9 +1081,8 @@ export default function LeadDiscovery() {
                             <button
                               key={suggestion}
                               type="button"
-                              className={`w-full px-4 py-2.5 text-left text-sm hover:bg-primary/10 transition-colors flex items-center gap-2 ${
-                                idx === 0 ? 'bg-primary/5' : ''
-                              }`}
+                              className={`w-full px-4 py-2.5 text-left text-sm hover:bg-primary/10 transition-colors flex items-center gap-2 ${idx === 0 ? 'bg-primary/5' : ''
+                                }`}
                               onMouseDown={(e) => {
                                 e.preventDefault()
                                 selectCategory(suggestion)
@@ -1135,9 +1144,8 @@ export default function LeadDiscovery() {
                             <button
                               key={suggestion}
                               type="button"
-                              className={`w-full px-4 py-2.5 text-left text-sm hover:bg-primary/10 transition-colors flex items-center gap-2 ${
-                                idx === 0 ? 'bg-primary/5' : ''
-                              }`}
+                              className={`w-full px-4 py-2.5 text-left text-sm hover:bg-primary/10 transition-colors flex items-center gap-2 ${idx === 0 ? 'bg-primary/5' : ''
+                                }`}
                               onMouseDown={(e) => {
                                 e.preventDefault()
                                 selectLocation(suggestion)
@@ -1370,11 +1378,10 @@ export default function LeadDiscovery() {
                     {loadingPhases.map((_, index) => (
                       <motion.div
                         key={index}
-                        className={`h-2 rounded-full transition-all duration-300 ${
-                          index <= loadingPhase
+                        className={`h-2 rounded-full transition-all duration-300 ${index <= loadingPhase
                             ? 'bg-gradient-to-r from-primary to-cold w-8'
                             : 'bg-surface w-2'
-                        }`}
+                          }`}
                         animate={index === loadingPhase ? { scale: [1, 1.2, 1] } : {}}
                         transition={{ duration: 0.5, repeat: Infinity }}
                       />
@@ -1488,6 +1495,78 @@ export default function LeadDiscovery() {
           animate={{ opacity: 1 }}
           className="space-y-4"
         >
+          {/* Pipeline Potential Value Banner */}
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <Card variant="surface" className="overflow-hidden border-success/30">
+              <div className="absolute inset-0 bg-gradient-to-r from-success/10 via-transparent to-primary/10" />
+              <CardContent className="relative py-4">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="p-2.5 rounded-xl bg-gradient-to-br from-success to-emerald-600 shadow-lg shadow-success/20">
+                      <DollarSign className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        Pipeline Potential Value
+                      </p>
+                      <p className="text-2xl font-bold text-success">
+                        ${pipelinePotential.totalPipelineValue.toLocaleString()}
+                        <span className="text-sm font-normal text-muted-foreground">/mo total</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-6">
+                    <div className="text-center">
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <Target className="h-3.5 w-3.5" />
+                        <span className="text-xs">Avg Lead Value</span>
+                      </div>
+                      <p className="text-lg font-semibold">
+                        ${pipelinePotential.avgLeadValue}
+                        <span className="text-xs font-normal text-muted-foreground">/mo</span>
+                      </p>
+                    </div>
+
+                    <div className="h-8 w-px bg-border" />
+
+                    <div className="text-center">
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <Percent className="h-3.5 w-3.5" />
+                        <span className="text-xs">At 1% Close Rate</span>
+                      </div>
+                      <p className="text-lg font-semibold text-primary">
+                        ${pipelinePotential.monthlyPotential.toLocaleString()}
+                        <span className="text-xs font-normal text-muted-foreground">/mo</span>
+                      </p>
+                    </div>
+
+                    <div className="h-8 w-px bg-border" />
+
+                    <div className="text-center">
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <TrendingUp className="h-3.5 w-3.5" />
+                        <span className="text-xs">Expected Closes</span>
+                      </div>
+                      <p className="text-lg font-semibold">
+                        {pipelinePotential.expectedCloses}
+                        <span className="text-xs font-normal text-muted-foreground"> deals</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border/50">
+                  Based on services priced between $500 to $1,000 per month.
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <h2 className="text-2xl font-semibold">
@@ -1516,6 +1595,7 @@ export default function LeadDiscovery() {
               const opportunityValue = scoringResult
                 ? calculateOpportunityValue(scoringResult.opportunities)
                 : null
+              const reviewOpportunity = calculateReviewOpportunity(lead.googleRating, lead.reviewCount)
               return (
                 <motion.div
                   key={lead.id}
@@ -1530,11 +1610,10 @@ export default function LeadDiscovery() {
                   <Card hover className="h-full relative overflow-hidden group">
                     {/* Score indicator bar */}
                     {scoringResult && (
-                      <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${
-                        scoringResult.totalScore >= 80 ? 'from-rose to-warm' :
-                        scoringResult.totalScore >= 60 ? 'from-warm to-yellow-500' :
-                        'from-cold to-blue-500'
-                      }`} />
+                      <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${scoringResult.totalScore >= 80 ? 'from-rose to-warm' :
+                          scoringResult.totalScore >= 60 ? 'from-warm to-yellow-500' :
+                            'from-cold to-blue-500'
+                        }`} />
                     )}
 
                     <CardHeader className="pb-3">
@@ -1572,19 +1651,37 @@ export default function LeadDiscovery() {
                         </div>
                       )}
 
-                      {lead.googleRating && (
-                        <div className="flex items-center gap-1.5">
-                          <Star className="h-4 w-4 fill-amber text-warm" />
-                          <span className="text-sm font-medium">
-                            {lead.googleRating.toFixed(1)}
-                          </span>
-                          {lead.reviewCount && (
-                            <span className="text-sm text-muted-foreground">
-                              ({lead.reviewCount})
+                      {/* Review stats and opportunity value */}
+                      <div className="flex items-center justify-between gap-2">
+                        {lead.googleRating ? (
+                          <div className="flex items-center gap-1.5">
+                            <Star className="h-4 w-4 fill-amber text-warm" />
+                            <span className="text-sm font-medium">
+                              {lead.googleRating.toFixed(1)}
                             </span>
-                          )}
-                        </div>
-                      )}
+                            {lead.reviewCount !== undefined && lead.reviewCount !== null && (
+                              <span className="text-sm text-muted-foreground">
+                                ({lead.reviewCount})
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <Star className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">No rating</span>
+                          </div>
+                        )}
+                        <Badge
+                          variant={
+                            reviewOpportunity.opportunityLevel === 'high' ? 'hot' :
+                              reviewOpportunity.opportunityLevel === 'medium' ? 'warm' :
+                                'cold'
+                          }
+                          className="text-2xs"
+                        >
+                          ${reviewOpportunity.leadValue}/mo
+                        </Badge>
+                      </div>
 
                       <div className="flex items-center gap-2">
                         {lead.email && (
@@ -1633,10 +1730,11 @@ export default function LeadDiscovery() {
                             className="opacity-60 hover:opacity-100"
                             onClick={(e) => {
                               e.stopPropagation()
-                              window.open(
-                                `https://instagram.com/${lead.instagram?.replace('@', '') ?? ''}`,
-                                '_blank'
-                              )
+                              // Handle both full URLs and usernames
+                              const url = lead.instagram?.startsWith('http')
+                                ? lead.instagram
+                                : `https://instagram.com/${lead.instagram?.replace('@', '') ?? ''}`
+                              window.open(url, '_blank')
                             }}
                           >
                             <Instagram className="h-4 w-4" />
@@ -1645,11 +1743,10 @@ export default function LeadDiscovery() {
                         <Button
                           size="icon-sm"
                           variant="ghost"
-                          className={`ml-auto transition-opacity ${
-                            isLeadSaved(lead.id)
+                          className={`ml-auto transition-opacity ${isLeadSaved(lead.id)
                               ? 'opacity-100 text-primary'
                               : 'opacity-0 group-hover:opacity-100'
-                          }`}
+                            }`}
                           onClick={(e) => handleToggleSave(lead, e)}
                         >
                           {isLeadSaved(lead.id) ? (
@@ -1797,12 +1894,16 @@ export default function LeadDiscovery() {
                     <div>
                       <p className="font-medium text-sm">Instagram</p>
                       <a
-                        href={`https://instagram.com/${selectedLead.instagram.replace('@', '')}`}
+                        href={selectedLead.instagram.startsWith('http')
+                          ? selectedLead.instagram
+                          : `https://instagram.com/${selectedLead.instagram.replace('@', '')}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-sm text-cold hover:underline flex items-center gap-1"
                       >
-                        {selectedLead.instagram}
+                        {selectedLead.instagram.startsWith('http')
+                          ? new URL(selectedLead.instagram).pathname.split('/').filter(Boolean).pop() || 'View Profile'
+                          : selectedLead.instagram}
                         <ExternalLink className="h-3 w-3" />
                       </a>
                     </div>
@@ -1817,7 +1918,9 @@ export default function LeadDiscovery() {
                     <div>
                       <p className="font-medium text-sm">Facebook</p>
                       <a
-                        href={selectedLead.facebook}
+                        href={selectedLead.facebook.startsWith('http')
+                          ? selectedLead.facebook
+                          : `https://facebook.com/${selectedLead.facebook}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-sm text-cold hover:underline flex items-center gap-1"
@@ -1837,7 +1940,9 @@ export default function LeadDiscovery() {
                     <div>
                       <p className="font-medium text-sm">LinkedIn</p>
                       <a
-                        href={selectedLead.linkedin}
+                        href={selectedLead.linkedin.startsWith('http')
+                          ? selectedLead.linkedin
+                          : `https://linkedin.com/company/${selectedLead.linkedin}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-sm text-cold hover:underline flex items-center gap-1"

@@ -204,3 +204,50 @@ export type ActivityType =
   | 'tag_added'
   | 'follow_up_scheduled'
   | 'enriched'
+  | 'deal_value_changed'
+
+// Stage configuration with win probabilities and rotting thresholds
+export interface StageConfig {
+  id: PipelineStage
+  title: string
+  gradient: string
+  glow: string
+  defaultWinProbability: number
+  rottingThresholdDays: number
+}
+
+// Stage history for velocity tracking
+export interface StageHistoryEntry {
+  stage: PipelineStage
+  enteredAt: string
+  exitedAt?: string
+  durationDays?: number
+}
+
+// Pipeline filters for advanced filtering
+export interface PipelineFilters {
+  stages?: PipelineStage[]
+  tags?: string[]
+  minValue?: number
+  maxValue?: number
+  minScore?: number
+  maxScore?: number
+  minDaysInStage?: number
+  maxDaysInStage?: number
+  isAtRisk?: boolean
+  hasFollowUp?: boolean
+  noFollowUp?: boolean
+  searchQuery?: string
+}
+
+// Saved view configuration
+export interface SavedView {
+  id: string
+  name: string
+  filters: PipelineFilters
+  createdAt: string
+  isDefault?: boolean
+}
+
+// Health status for deal rotting
+export type HealthStatus = 'healthy' | 'aging' | 'at_risk'

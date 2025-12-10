@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
+    "dev:full": "concurrently \"npm run dev:client\" \"npm run dev:server\" \"npm run tech-detector\"",
     "dev:client": "vite",
     "dev:server": "tsx watch server/index.ts",
     "build": "tsc && vite build",
@@ -14,7 +15,9 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "tech-detector": "cd tech-detector && ./run.sh",
+    "tech-detector:setup": "cd tech-detector && python3 -m venv venv && ./venv/bin/pip install -r requirements.txt"
   },
   "repository": {
     "type": "git",
@@ -62,6 +65,7 @@
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",

@@ -18,6 +18,14 @@ import {
   ArrowLeft,
   Bookmark,
   BookmarkCheck,
+  Instagram,
+  Facebook,
+  Linkedin,
+  Twitter,
+  Youtube,
+  Sparkles,
+  Loader2,
+  CheckSquare,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -33,8 +41,23 @@ import {
   useLeadStore,
   type SearchHistoryEntry,
 } from '@/hooks/useLeadStore'
+import { useLeadAnalysis } from '@/hooks/useLeadAnalysis'
 import { LeadDetailModal } from '@/components/LeadDetailModal'
+import { Progress } from '@/components/ui/progress'
 import type { Lead, ContactMethod } from '@/types'
+import type { ScoringResult } from '@/lib/leadScoring'
+
+// TikTok icon component (not in lucide-react)
+const TikTokIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
+  </svg>
+)
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -70,6 +93,17 @@ export default function SearchHistory() {
 
   const [selectedSearch, setSelectedSearch] = useState<SearchHistoryEntry | null>(null)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+  const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set())
+
+  // Lead analysis hook
+  const {
+    isAnalyzing,
+    progress: analysisProgress,
+    currentLeadId,
+    analyzeLead,
+    analyzeLeads,
+    getAnalysis,
+  } = useLeadAnalysis()
 
   const isInPipeline = (leadId: string) =>
     pipelineLeads.some((l) => l.id === leadId)
@@ -101,6 +135,54 @@ export default function SearchHistory() {
       setSelectedSearch(null)
     }
     toast.success('Search removed from history')
+  }
+
+  // Toggle lead selection
+  const toggleLeadSelection = (leadId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    setSelectedLeads((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(leadId)) {
+        newSet.delete(leadId)
+      } else {
+        newSet.add(leadId)
+      }
+      return newSet
+    })
+  }
+
+  // Select/deselect all leads in current search
+  const toggleSelectAll = () => {
+    if (!selectedSearch) return
+    if (selectedLeads.size === selectedSearch.leads.length) {
+      setSelectedLeads(new Set())
+    } else {
+      setSelectedLeads(new Set(selectedSearch.leads.map((l) => l.id)))
+    }
+  }
+
+  // Handle bulk analysis of selected leads
+  const handleBulkAnalyze = async () => {
+    if (!selectedSearch || selectedLeads.size === 0) return
+    const leadsToAnalyze = selectedSearch.leads.filter((l) => selectedLeads.has(l.id))
+    await analyzeLeads(leadsToAnalyze)
+  }
+
+  // Handle analyzing all leads in current search
+  const handleAnalyzeAll = async () => {
+    if (!selectedSearch) return
+    await analyzeLeads(selectedSearch.leads)
+  }
+
+  // Handle single lead analysis (for modal)
+  const handleAnalyzeLead = async (lead: Lead): Promise<ScoringResult | null> => {
+    return await analyzeLead(lead)
+  }
+
+  // Clear selection when changing search
+  const handleSelectSearch = (search: SearchHistoryEntry) => {
+    setSelectedLeads(new Set())
+    setSelectedSearch(search)
   }
 
   // Group searches by date
@@ -223,7 +305,96 @@ export default function SearchHistory() {
                 </div>
               </Card>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <>
+                {/* Bulk Actions Bar */}
+                <AnimatePresence>
+                  {selectedLeads.size > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                    >
+                      <Card className="p-3 bg-primary/5 border-primary/20">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                          <div className="flex items-center gap-3">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setSelectedLeads(new Set())}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                            <span className="text-sm font-medium">
+                              {selectedLeads.size} selected
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 sm:ml-auto">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleBulkAnalyze}
+                              disabled={isAnalyzing}
+                              className="gap-1 bg-primary/5 border-primary/20 hover:bg-primary/10"
+                            >
+                              <Sparkles className="h-4 w-4 text-primary" />
+                              Analyze Selected
+                            </Button>
+                          </div>
+                        </div>
+                        {/* Analysis Progress */}
+                        {isAnalyzing && (
+                          <div className="mt-3 space-y-1">
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span className="flex items-center gap-2">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                Analyzing leads...
+                              </span>
+                              <span>{analysisProgress}%</span>
+                            </div>
+                            <Progress value={analysisProgress} className="h-1.5" />
+                          </div>
+                        )}
+                      </Card>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Actions Row */}
+                <div className="flex items-center justify-between">
+                  <Button variant="ghost" size="sm" onClick={toggleSelectAll}>
+                    {selectedLeads.size === selectedSearch.leads.length
+                      ? 'Deselect All'
+                      : 'Select All'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAnalyzeAll}
+                    disabled={isAnalyzing}
+                    className="gap-2 bg-primary/5 border-primary/20 hover:bg-primary/10"
+                  >
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    Analyze All ({selectedSearch.leads.length})
+                  </Button>
+                </div>
+
+                {/* Analysis Progress (when analyzing all) */}
+                {isAnalyzing && selectedLeads.size === 0 && (
+                  <Card className="p-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm text-muted-foreground">
+                        <span className="flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                          Analyzing all leads...
+                        </span>
+                        <span>{analysisProgress}%</span>
+                      </div>
+                      <Progress value={analysisProgress} className="h-2" />
+                    </div>
+                  </Card>
+                )}
+
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {selectedSearch.leads.map((lead, index) => (
                   <motion.div
                     key={lead.id}
@@ -233,10 +404,28 @@ export default function SearchHistory() {
                   >
                     <Card
                       variant="interactive"
-                      className="h-full"
+                      className={`h-full relative ${
+                        selectedLeads.has(lead.id)
+                          ? 'ring-2 ring-primary border-primary/50'
+                          : ''
+                      }`}
                       onClick={() => setSelectedLead(lead)}
                     >
-                      <CardContent className="p-4">
+                      {/* Selection Checkbox */}
+                      <button
+                        onClick={(e) => toggleLeadSelection(lead.id, e)}
+                        className={`absolute top-3 left-3 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors z-10 ${
+                          selectedLeads.has(lead.id)
+                            ? 'bg-primary border-primary text-white'
+                            : 'border-border bg-background hover:border-primary/50'
+                        }`}
+                      >
+                        {selectedLeads.has(lead.id) && (
+                          <CheckSquare className="h-3 w-3" />
+                        )}
+                      </button>
+
+                      <CardContent className="p-4 pl-10">
                         <div className="space-y-3">
                           {/* Header */}
                           <div className="flex items-start justify-between gap-2">
@@ -248,14 +437,31 @@ export default function SearchHistory() {
                                 {lead.category}
                               </p>
                             </div>
-                            {lead.googleRating && (
-                              <div className="flex items-center gap-1 text-sm">
-                                <Star className="h-4 w-4 fill-warm text-warm" />
-                                <span className="font-medium">
-                                  {lead.googleRating.toFixed(1)}
-                                </span>
-                              </div>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {/* Score badge if analyzed */}
+                              {getAnalysis(lead.id) && (
+                                <Badge
+                                  variant={
+                                    getAnalysis(lead.id)!.totalScore >= 70
+                                      ? 'hot'
+                                      : getAnalysis(lead.id)!.totalScore >= 50
+                                      ? 'warm'
+                                      : 'cold'
+                                  }
+                                  className="text-xs"
+                                >
+                                  {getAnalysis(lead.id)!.totalScore}
+                                </Badge>
+                              )}
+                              {lead.googleRating && (
+                                <div className="flex items-center gap-1 text-sm">
+                                  <Star className="h-4 w-4 fill-warm text-warm" />
+                                  <span className="font-medium">
+                                    {lead.googleRating.toFixed(1)}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
                           </div>
 
                           {/* Location */}
@@ -267,7 +473,7 @@ export default function SearchHistory() {
                           </div>
 
                           {/* Contact Info */}
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2 flex-wrap">
                             {lead.phone && (
                               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                 <Phone className="h-3 w-3" />
@@ -281,6 +487,36 @@ export default function SearchHistory() {
                             {lead.website && (
                               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                 <Globe className="h-3 w-3" />
+                              </div>
+                            )}
+                            {lead.instagram && (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Instagram className="h-3 w-3" />
+                              </div>
+                            )}
+                            {lead.facebook && (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Facebook className="h-3 w-3" />
+                              </div>
+                            )}
+                            {lead.linkedin && (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Linkedin className="h-3 w-3" />
+                              </div>
+                            )}
+                            {lead.twitter && (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Twitter className="h-3 w-3" />
+                              </div>
+                            )}
+                            {lead.tiktok && (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <TikTokIcon className="h-3 w-3" />
+                              </div>
+                            )}
+                            {lead.youtube && (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Youtube className="h-3 w-3" />
                               </div>
                             )}
                             {isInPipeline(lead.id) && (
@@ -322,7 +558,8 @@ export default function SearchHistory() {
                     </Card>
                   </motion.div>
                 ))}
-              </div>
+                </div>
+              </>
             )}
           </motion.div>
         ) : searchHistory.length === 0 ? (
@@ -374,7 +611,7 @@ export default function SearchHistory() {
                       <Card
                         variant="interactive"
                         className="cursor-pointer"
-                        onClick={() => setSelectedSearch(search)}
+                        onClick={() => handleSelectSearch(search)}
                       >
                         <CardContent className="p-4">
                           <div className="flex items-center justify-between gap-4">
@@ -461,6 +698,10 @@ export default function SearchHistory() {
         onScheduleFollowUp={() => {
           toast.info('Add to pipeline first to schedule follow-ups')
         }}
+        onAnalyze={handleAnalyzeLead}
+        isAnalyzing={isAnalyzing && currentLeadId === selectedLead?.id}
+        analysisProgress={analysisProgress}
+        scoringResult={selectedLead ? getAnalysis(selectedLead.id) : undefined}
       />
     </motion.div>
   )

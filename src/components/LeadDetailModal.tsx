@@ -26,6 +26,9 @@ import {
   Facebook,
   BadgeCheck,
   AlertCircle,
+  Sparkles,
+  Loader2,
+  TrendingUp,
 } from 'lucide-react'
 
 // TikTok icon component (not in lucide-react)
@@ -39,6 +42,43 @@ const TikTokIcon = ({ className }: { className?: string }) => (
     <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
   </svg>
 )
+
+// Helper to get proper social media URL (handles both full URLs and usernames)
+function getSocialUrl(platform: string, value: string | undefined): string {
+  if (!value) return ''
+  // If it's already a full URL, return it
+  if (value.startsWith('http://') || value.startsWith('https://')) {
+    return value
+  }
+  // Otherwise, construct the URL from the username
+  const username = value.replace('@', '')
+  const baseUrls: Record<string, string> = {
+    instagram: 'https://instagram.com/',
+    facebook: 'https://facebook.com/',
+    linkedin: 'https://linkedin.com/in/',
+    twitter: 'https://twitter.com/',
+    tiktok: 'https://tiktok.com/@',
+    youtube: 'https://youtube.com/@',
+  }
+  return `${baseUrls[platform] || ''}${username}`
+}
+
+// Helper to extract display name from URL or username
+function getSocialDisplayName(value: string | undefined): string {
+  if (!value) return ''
+  // If it's a URL, extract the username/handle
+  if (value.startsWith('http://') || value.startsWith('https://')) {
+    try {
+      const url = new URL(value)
+      // Get the last meaningful path segment
+      const pathParts = url.pathname.split('/').filter(Boolean)
+      return pathParts[pathParts.length - 1] || url.hostname
+    } catch {
+      return value
+    }
+  }
+  return value
+}
 import {
   Dialog,
   DialogContent,
@@ -58,7 +98,9 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
+import { Progress } from '@/components/ui/progress'
 import type { Lead, ContactMethod, PipelineStage } from '@/types'
+import type { ScoringResult } from '@/lib/leadScoring'
 
 interface Activity {
   id: string
@@ -98,6 +140,11 @@ interface LeadDetailModalProps {
   onRemoveCustomField?: (key: string) => void
   onScheduleFollowUp: (date: string, note?: string) => void
   onStageChange?: (stage: PipelineStage) => void
+  // Pro Intelligence analysis
+  onAnalyze?: (lead: Lead) => Promise<ScoringResult | null>
+  isAnalyzing?: boolean
+  analysisProgress?: number
+  scoringResult?: ScoringResult | null
 }
 
 const stages: Array<{ id: PipelineStage; label: string; color: string }> = [
@@ -131,6 +178,10 @@ export function LeadDetailModal({
   onRemoveCustomField,
   onScheduleFollowUp,
   onStageChange,
+  onAnalyze,
+  isAnalyzing,
+  analysisProgress,
+  scoringResult,
 }: LeadDetailModalProps) {
   const [newNote, setNewNote] = useState('')
   const [newTag, setNewTag] = useState('')
@@ -186,6 +237,19 @@ export function LeadDetailModal({
 
   if (!lead) return null
 
+  // Helper to get score color
+  const getScoreColor = (score: number) => {
+    if (score >= 70) return 'text-hot'
+    if (score >= 50) return 'text-warm'
+    return 'text-cold'
+  }
+
+  const getScoreBg = (score: number) => {
+    if (score >= 70) return 'bg-hot/10 border-hot/30'
+    if (score >= 50) return 'bg-warm/10 border-warm/30'
+    return 'bg-cold/10 border-cold/30'
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] p-0">
@@ -197,18 +261,105 @@ export function LeadDetailModal({
                 {lead.category}
               </p>
             </div>
-            {lead.googleRating && (
-              <div className="flex items-center gap-1 bg-amber-500/10 px-2 py-1 rounded-md">
-                <Star className="h-4 w-4 fill-amber-500 text-amber-500" />
-                <span className="font-medium">{lead.googleRating.toFixed(1)}</span>
-                {lead.reviewCount && (
-                  <span className="text-xs text-muted-foreground">
-                    ({lead.reviewCount})
+            <div className="flex items-center gap-2">
+              {lead.googleRating && (
+                <div className="flex items-center gap-1 bg-amber-500/10 px-2 py-1 rounded-md">
+                  <Star className="h-4 w-4 fill-amber-500 text-amber-500" />
+                  <span className="font-medium">{lead.googleRating.toFixed(1)}</span>
+                  {lead.reviewCount && (
+                    <span className="text-xs text-muted-foreground">
+                      ({lead.reviewCount})
+                    </span>
+                  )}
+                </div>
+              )}
+              {/* Score badge if analyzed */}
+              {scoringResult && (
+                <div className={cn(
+                  'flex items-center gap-1 px-2 py-1 rounded-md border',
+                  getScoreBg(scoringResult.totalScore)
+                )}>
+                  <TrendingUp className={cn('h-4 w-4', getScoreColor(scoringResult.totalScore))} />
+                  <span className={cn('font-bold', getScoreColor(scoringResult.totalScore))}>
+                    {scoringResult.totalScore}
                   </span>
-                )}
-              </div>
-            )}
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* Pro Intelligence Analysis Button/Status */}
+          {onAnalyze && (
+            <div className="mt-4">
+              {isAnalyzing ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    <span>Analyzing lead...</span>
+                    <span className="ml-auto text-xs">{analysisProgress}%</span>
+                  </div>
+                  <Progress value={analysisProgress} className="h-1.5" />
+                </div>
+              ) : scoringResult ? (
+                <div className={cn(
+                  'p-3 rounded-lg border',
+                  getScoreBg(scoringResult.totalScore)
+                )}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className={cn('h-4 w-4', getScoreColor(scoringResult.totalScore))} />
+                      <span className="text-sm font-medium">Pro Intelligence Score</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {scoringResult.opportunities.length > 0 && (
+                        <div className="text-xs text-muted-foreground">
+                          <span className="font-medium text-foreground">
+                            ${scoringResult.opportunities.reduce((sum, o) => sum + o.value, 0).toLocaleString()}
+                          </span>
+                          /mo opportunity
+                        </div>
+                      )}
+                      <Badge variant={
+                        scoringResult.totalScore >= 70 ? 'hot' :
+                        scoringResult.totalScore >= 50 ? 'warm' : 'cold'
+                      }>
+                        {scoringResult.totalScore >= 70 ? 'Hot' :
+                         scoringResult.totalScore >= 50 ? 'Warm' : 'Cold'} Lead
+                      </Badge>
+                    </div>
+                  </div>
+                  {scoringResult.opportunities.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {scoringResult.opportunities.slice(0, 3).map((opp, i) => (
+                        <Badge key={i} variant="outline" className="text-xs">
+                          {opp.tool}: ${opp.value}/mo
+                        </Badge>
+                      ))}
+                      {scoringResult.opportunities.length > 3 && (
+                        <Badge variant="outline" className="text-xs">
+                          +{scoringResult.opportunities.length - 3} more
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : lead.website ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onAnalyze(lead as Lead)}
+                  className="w-full gap-2 bg-primary/5 border-primary/20 hover:bg-primary/10"
+                >
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  Analyze with Pro Intelligence
+                </Button>
+              ) : (
+                <div className="text-xs text-muted-foreground text-center py-2">
+                  No website available for analysis
+                </div>
+              )}
+            </div>
+          )}
         </DialogHeader>
 
         <Tabs defaultValue="details" className="flex-1">
@@ -285,56 +436,68 @@ export function LeadDetailModal({
                   )}
                   {lead.instagram && (
                     <button
-                      onClick={() => onContact('instagram')}
+                      onClick={() => {
+                        window.open(getSocialUrl('instagram', lead.instagram), '_blank')
+                        onContact('instagram')
+                      }}
                       className="flex items-center gap-2 text-sm hover:text-primary transition-colors"
                     >
                       <Instagram className="h-4 w-4 text-muted-foreground" />
-                      <span>{lead.instagram}</span>
+                      <span>{getSocialDisplayName(lead.instagram)}</span>
                     </button>
                   )}
                   {lead.facebook && (
                     <button
-                      onClick={() => onContact('facebook')}
+                      onClick={() => {
+                        window.open(getSocialUrl('facebook', lead.facebook), '_blank')
+                        onContact('facebook')
+                      }}
                       className="flex items-center gap-2 text-sm hover:text-primary transition-colors"
                     >
                       <Facebook className="h-4 w-4 text-muted-foreground" />
-                      <span>{lead.facebook}</span>
+                      <span>{getSocialDisplayName(lead.facebook)}</span>
                     </button>
                   )}
                   {lead.linkedin && (
                     <button
-                      onClick={() => onContact('linkedin')}
+                      onClick={() => {
+                        window.open(getSocialUrl('linkedin', lead.linkedin), '_blank')
+                        onContact('linkedin')
+                      }}
                       className="flex items-center gap-2 text-sm hover:text-primary transition-colors"
                     >
                       <Linkedin className="h-4 w-4 text-muted-foreground" />
-                      <span>{lead.linkedin}</span>
+                      <span>{getSocialDisplayName(lead.linkedin)}</span>
                     </button>
                   )}
                   {lead.twitter && (
                     <button
-                      onClick={() => onContact('twitter')}
+                      onClick={() => {
+                        window.open(getSocialUrl('twitter', lead.twitter), '_blank')
+                        onContact('twitter')
+                      }}
                       className="flex items-center gap-2 text-sm hover:text-primary transition-colors"
                     >
                       <Twitter className="h-4 w-4 text-muted-foreground" />
-                      <span>{lead.twitter}</span>
+                      <span>{getSocialDisplayName(lead.twitter)}</span>
                     </button>
                   )}
                   {lead.tiktok && (
                     <button
-                      onClick={() => window.open(`https://tiktok.com/@${lead.tiktok?.replace('@', '') ?? ''}`, '_blank')}
+                      onClick={() => window.open(getSocialUrl('tiktok', lead.tiktok), '_blank')}
                       className="flex items-center gap-2 text-sm hover:text-primary transition-colors"
                     >
                       <TikTokIcon className="h-4 w-4 text-muted-foreground" />
-                      <span>{lead.tiktok}</span>
+                      <span>{getSocialDisplayName(lead.tiktok)}</span>
                     </button>
                   )}
                   {lead.youtube && (
                     <button
-                      onClick={() => window.open(lead.youtube?.startsWith('http') ? lead.youtube : `https://youtube.com/@${lead.youtube}`, '_blank')}
+                      onClick={() => window.open(getSocialUrl('youtube', lead.youtube), '_blank')}
                       className="flex items-center gap-2 text-sm hover:text-primary transition-colors"
                     >
                       <Youtube className="h-4 w-4 text-muted-foreground" />
-                      <span>{lead.youtube}</span>
+                      <span>{getSocialDisplayName(lead.youtube)}</span>
                     </button>
                   )}
                 </div>

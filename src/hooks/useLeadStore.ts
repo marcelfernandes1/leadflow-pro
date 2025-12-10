@@ -1,10 +1,32 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Lead, PipelineStage, ContactMethod } from '@/types'
+import type { Lead, PipelineStage, ContactMethod, StageHistoryEntry, PipelineFilters, SavedView, HealthStatus } from '@/types'
+
+// Stage win probabilities (used for weighted pipeline value)
+export const STAGE_WIN_PROBABILITIES: Record<PipelineStage, number> = {
+  new: 10,
+  contacted: 20,
+  qualified: 40,
+  proposal: 60,
+  negotiation: 80,
+  won: 100,
+  lost: 0,
+}
+
+// Days before a deal is considered "at risk" per stage
+export const STAGE_ROTTING_DAYS: Record<PipelineStage, number> = {
+  new: 3,
+  contacted: 5,
+  qualified: 7,
+  proposal: 10,
+  negotiation: 14,
+  won: Infinity,
+  lost: Infinity,
+}
 
 export interface PipelineActivity {
   id: string
-  type: 'contacted' | 'note_added' | 'stage_changed' | 'tag_added' | 'follow_up_scheduled'
+  type: 'contacted' | 'note_added' | 'stage_changed' | 'tag_added' | 'follow_up_scheduled' | 'deal_value_changed'
   contactMethod?: string
   details: string
   createdAt: string
@@ -26,6 +48,15 @@ export interface PipelineLead extends Lead {
   nextFollowUpAt?: string
   lastContactedAt?: string
   lastContactMethod?: ContactMethod
+
+  // Deal value tracking
+  dealValue?: number
+  currency?: string
+  winProbability?: number
+
+  // Health tracking
+  stageEnteredAt: string
+  stageHistory: StageHistoryEntry[]
 }
 
 export interface SavedLead extends Lead {
@@ -62,6 +93,22 @@ interface LeadStore {
   updateLeadStage: (pipelineId: string, stage: PipelineStage) => void
   getLeadsByStage: (stage: PipelineStage) => PipelineLead[]
 
+  // Deal value tracking
+  setDealValue: (pipelineId: string, value: number) => void
+  setWinProbability: (pipelineId: string, probability: number) => void
+
+  // Pipeline metrics (computed)
+  getTotalPipelineValue: () => number
+  getWeightedPipelineValue: () => number
+  getStageValue: (stage: PipelineStage) => number
+  getStageWeightedValue: (stage: PipelineStage) => number
+
+  // Health tracking
+  getLeadDaysInStage: (pipelineId: string) => number
+  getLeadHealthStatus: (pipelineId: string) => HealthStatus
+  getAtRiskLeads: () => PipelineLead[]
+  getLeadHealthPercentage: (pipelineId: string) => number
+
   // Contact tracking
   trackContact: (pipelineId: string, method: ContactMethod, notes?: string) => void
 
@@ -86,6 +133,32 @@ interface LeadStore {
   bulkUpdateStage: (pipelineIds: string[], stage: PipelineStage) => void
   bulkDelete: (pipelineIds: string[]) => void
   bulkAddTags: (pipelineIds: string[], tags: string[]) => void
+
+  // Filtering
+  activeFilters: PipelineFilters
+  setFilters: (filters: PipelineFilters) => void
+  clearFilters: () => void
+  getFilteredLeads: () => PipelineLead[]
+
+  // Saved views
+  savedViews: SavedView[]
+  currentViewId: string | null
+  addSavedView: (name: string, filters: PipelineFilters) => void
+  updateSavedView: (id: string, updates: Partial<SavedView>) => void
+  deleteSavedView: (id: string) => void
+  setCurrentView: (id: string | null) => void
+
+  // Focus mode
+  focusedLeadId: string | null
+  setFocusedLead: (pipelineId: string | null) => void
+  navigateToNextLead: () => void
+  navigateToPrevLead: () => void
+
+  // Keyboard navigation
+  selectedLeadIndex: number
+  selectedStageIndex: number
+  setSelectedLeadIndex: (index: number) => void
+  setSelectedStageIndex: (index: number) => void
 
   // Search history
   lastSearch: { category: string; location: string } | null
@@ -152,6 +225,18 @@ export const useLeadStore = create<LeadStore>()(
               createdAt: now,
             },
           ],
+          // Deal value tracking
+          dealValue: undefined,
+          currency: 'USD',
+          winProbability: undefined,
+          // Health tracking
+          stageEnteredAt: now,
+          stageHistory: [
+            {
+              stage: 'new',
+              enteredAt: now,
+            },
+          ],
         }
         set((state) => ({
           pipelineLeads: [...state.pipelineLeads, pipelineLead],
@@ -167,10 +252,27 @@ export const useLeadStore = create<LeadStore>()(
         set((state) => ({
           pipelineLeads: state.pipelineLeads.map((l) => {
             if (l.pipelineId !== pipelineId) return l
+            if (l.stage === stage) return l // No change
             const now = new Date().toISOString()
+            const updatedHistory = l.stageHistory.map((h) => {
+              if (h.stage === l.stage && !h.exitedAt) {
+                const enteredDate = new Date(h.enteredAt)
+                const exitedDate = new Date(now)
+                const durationDays = Math.round(
+                  (exitedDate.getTime() - enteredDate.getTime()) / (1000 * 60 * 60 * 24)
+                )
+                return { ...h, exitedAt: now, durationDays }
+              }
+              return h
+            })
             return {
               ...l,
               stage,
+              stageEnteredAt: now,
+              stageHistory: [
+                ...updatedHistory,
+                { stage, enteredAt: now },
+              ],
               activities: [
                 ...l.activities,
                 {
@@ -185,6 +287,99 @@ export const useLeadStore = create<LeadStore>()(
         })),
       getLeadsByStage: (stage) =>
         get().pipelineLeads.filter((l) => l.stage === stage),
+
+      // Deal value tracking
+      setDealValue: (pipelineId, value) =>
+        set((state) => ({
+          pipelineLeads: state.pipelineLeads.map((l) => {
+            if (l.pipelineId !== pipelineId) return l
+            const now = new Date().toISOString()
+            const oldValue = l.dealValue
+            return {
+              ...l,
+              dealValue: value,
+              activities: [
+                ...l.activities,
+                {
+                  id: `activity-${Date.now()}`,
+                  type: 'deal_value_changed' as const,
+                  details: oldValue
+                    ? `Deal value changed from $${oldValue.toLocaleString()} to $${value.toLocaleString()}`
+                    : `Deal value set to $${value.toLocaleString()}`,
+                  createdAt: now,
+                },
+              ],
+            }
+          }),
+        })),
+      setWinProbability: (pipelineId, probability) =>
+        set((state) => ({
+          pipelineLeads: state.pipelineLeads.map((l) =>
+            l.pipelineId === pipelineId ? { ...l, winProbability: probability } : l
+          ),
+        })),
+
+      // Pipeline metrics (computed)
+      getTotalPipelineValue: () => {
+        return get()
+          .pipelineLeads.filter((l) => l.stage !== 'lost')
+          .reduce((sum, l) => sum + (l.dealValue || 0), 0)
+      },
+      getWeightedPipelineValue: () => {
+        return get()
+          .pipelineLeads.filter((l) => l.stage !== 'lost' && l.stage !== 'won')
+          .reduce((sum, l) => {
+            const prob = l.winProbability ?? STAGE_WIN_PROBABILITIES[l.stage]
+            return sum + (l.dealValue || 0) * (prob / 100)
+          }, 0)
+      },
+      getStageValue: (stage) => {
+        return get()
+          .pipelineLeads.filter((l) => l.stage === stage)
+          .reduce((sum, l) => sum + (l.dealValue || 0), 0)
+      },
+      getStageWeightedValue: (stage) => {
+        return get()
+          .pipelineLeads.filter((l) => l.stage === stage)
+          .reduce((sum, l) => {
+            const prob = l.winProbability ?? STAGE_WIN_PROBABILITIES[stage]
+            return sum + (l.dealValue || 0) * (prob / 100)
+          }, 0)
+      },
+
+      // Health tracking
+      getLeadDaysInStage: (pipelineId) => {
+        const lead = get().pipelineLeads.find((l) => l.pipelineId === pipelineId)
+        if (!lead) return 0
+        const enteredDate = new Date(lead.stageEnteredAt)
+        const now = new Date()
+        return Math.round((now.getTime() - enteredDate.getTime()) / (1000 * 60 * 60 * 24))
+      },
+      getLeadHealthStatus: (pipelineId) => {
+        const lead = get().pipelineLeads.find((l) => l.pipelineId === pipelineId)
+        if (!lead) return 'healthy'
+        const daysInStage = get().getLeadDaysInStage(pipelineId)
+        const threshold = STAGE_ROTTING_DAYS[lead.stage]
+        if (threshold === Infinity) return 'healthy'
+        if (daysInStage >= threshold) return 'at_risk'
+        if (daysInStage >= threshold * 0.5) return 'aging'
+        return 'healthy'
+      },
+      getLeadHealthPercentage: (pipelineId) => {
+        const lead = get().pipelineLeads.find((l) => l.pipelineId === pipelineId)
+        if (!lead) return 0
+        const daysInStage = get().getLeadDaysInStage(pipelineId)
+        const threshold = STAGE_ROTTING_DAYS[lead.stage]
+        if (threshold === Infinity) return 0
+        return Math.min(100, (daysInStage / threshold) * 100)
+      },
+      getAtRiskLeads: () => {
+        return get().pipelineLeads.filter((l) => {
+          const daysInStage = get().getLeadDaysInStage(l.pipelineId)
+          const threshold = STAGE_ROTTING_DAYS[l.stage]
+          return threshold !== Infinity && daysInStage >= threshold
+        })
+      },
 
       // Contact tracking
       trackContact: (pipelineId, method, notes) =>
@@ -369,10 +564,27 @@ export const useLeadStore = create<LeadStore>()(
         set((state) => ({
           pipelineLeads: state.pipelineLeads.map((l) => {
             if (!pipelineIds.includes(l.pipelineId)) return l
+            if (l.stage === stage) return l // No change
             const now = new Date().toISOString()
+            const updatedHistory = l.stageHistory.map((h) => {
+              if (h.stage === l.stage && !h.exitedAt) {
+                const enteredDate = new Date(h.enteredAt)
+                const exitedDate = new Date(now)
+                const durationDays = Math.round(
+                  (exitedDate.getTime() - enteredDate.getTime()) / (1000 * 60 * 60 * 24)
+                )
+                return { ...h, exitedAt: now, durationDays }
+              }
+              return h
+            })
             return {
               ...l,
               stage,
+              stageEnteredAt: now,
+              stageHistory: [
+                ...updatedHistory,
+                { stage, enteredAt: now },
+              ],
               activities: [
                 ...l.activities,
                 {
@@ -403,6 +615,131 @@ export const useLeadStore = create<LeadStore>()(
             }
           }),
         })),
+
+      // Filtering
+      activeFilters: {},
+      setFilters: (filters) => set({ activeFilters: filters }),
+      clearFilters: () => set({ activeFilters: {} }),
+      getFilteredLeads: () => {
+        const { pipelineLeads, activeFilters } = get()
+        if (Object.keys(activeFilters).length === 0) return pipelineLeads
+
+        return pipelineLeads.filter((lead) => {
+          // Stage filter
+          if (activeFilters.stages?.length && !activeFilters.stages.includes(lead.stage)) {
+            return false
+          }
+          // Tag filter
+          if (activeFilters.tags?.length) {
+            const hasMatchingTag = activeFilters.tags.some((t) => lead.tags.includes(t))
+            if (!hasMatchingTag) return false
+          }
+          // Value range filter
+          if (activeFilters.minValue !== undefined && (lead.dealValue || 0) < activeFilters.minValue) {
+            return false
+          }
+          if (activeFilters.maxValue !== undefined && (lead.dealValue || 0) > activeFilters.maxValue) {
+            return false
+          }
+          // Score range filter
+          if (activeFilters.minScore !== undefined && (lead.leadScore || 0) < activeFilters.minScore) {
+            return false
+          }
+          if (activeFilters.maxScore !== undefined && (lead.leadScore || 0) > activeFilters.maxScore) {
+            return false
+          }
+          // Days in stage filter
+          const daysInStage = get().getLeadDaysInStage(lead.pipelineId)
+          if (activeFilters.minDaysInStage !== undefined && daysInStage < activeFilters.minDaysInStage) {
+            return false
+          }
+          if (activeFilters.maxDaysInStage !== undefined && daysInStage > activeFilters.maxDaysInStage) {
+            return false
+          }
+          // At risk filter
+          if (activeFilters.isAtRisk) {
+            const status = get().getLeadHealthStatus(lead.pipelineId)
+            if (status !== 'at_risk') return false
+          }
+          // Follow-up filters
+          if (activeFilters.hasFollowUp && !lead.nextFollowUpAt) {
+            return false
+          }
+          if (activeFilters.noFollowUp && lead.nextFollowUpAt) {
+            return false
+          }
+          // Search query filter
+          if (activeFilters.searchQuery) {
+            const query = activeFilters.searchQuery.toLowerCase()
+            const matchesName = lead.businessName.toLowerCase().includes(query)
+            const matchesCategory = lead.category?.toLowerCase().includes(query)
+            const matchesCity = lead.city?.toLowerCase().includes(query)
+            if (!matchesName && !matchesCategory && !matchesCity) return false
+          }
+          return true
+        })
+      },
+
+      // Saved views
+      savedViews: [],
+      currentViewId: null,
+      addSavedView: (name, filters) => {
+        const view: SavedView = {
+          id: `view-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          name,
+          filters,
+          createdAt: new Date().toISOString(),
+        }
+        set((state) => ({
+          savedViews: [...state.savedViews, view],
+          currentViewId: view.id,
+          activeFilters: filters,
+        }))
+      },
+      updateSavedView: (id, updates) =>
+        set((state) => ({
+          savedViews: state.savedViews.map((v) =>
+            v.id === id ? { ...v, ...updates } : v
+          ),
+        })),
+      deleteSavedView: (id) =>
+        set((state) => ({
+          savedViews: state.savedViews.filter((v) => v.id !== id),
+          currentViewId: state.currentViewId === id ? null : state.currentViewId,
+        })),
+      setCurrentView: (id) => {
+        const view = id ? get().savedViews.find((v) => v.id === id) : null
+        set({
+          currentViewId: id,
+          activeFilters: view?.filters || {},
+        })
+      },
+
+      // Focus mode
+      focusedLeadId: null,
+      setFocusedLead: (pipelineId) => set({ focusedLeadId: pipelineId }),
+      navigateToNextLead: () => {
+        const { pipelineLeads, focusedLeadId } = get()
+        if (!focusedLeadId) return
+        const currentIndex = pipelineLeads.findIndex((l) => l.pipelineId === focusedLeadId)
+        if (currentIndex === -1) return
+        const nextIndex = (currentIndex + 1) % pipelineLeads.length
+        set({ focusedLeadId: pipelineLeads[nextIndex].pipelineId })
+      },
+      navigateToPrevLead: () => {
+        const { pipelineLeads, focusedLeadId } = get()
+        if (!focusedLeadId) return
+        const currentIndex = pipelineLeads.findIndex((l) => l.pipelineId === focusedLeadId)
+        if (currentIndex === -1) return
+        const prevIndex = (currentIndex - 1 + pipelineLeads.length) % pipelineLeads.length
+        set({ focusedLeadId: pipelineLeads[prevIndex].pipelineId })
+      },
+
+      // Keyboard navigation
+      selectedLeadIndex: -1,
+      selectedStageIndex: 0,
+      setSelectedLeadIndex: (index) => set({ selectedLeadIndex: index }),
+      setSelectedStageIndex: (index) => set({ selectedStageIndex: index }),
 
       // Search history
       lastSearch: null,
@@ -443,6 +780,9 @@ export const useLeadStore = create<LeadStore>()(
         savedLeads: state.savedLeads,
         lastSearch: state.lastSearch,
         searchHistory: state.searchHistory,
+        savedViews: state.savedViews,
+        currentViewId: state.currentViewId,
+        activeFilters: state.activeFilters,
       }),
     }
   )
